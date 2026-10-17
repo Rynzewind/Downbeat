@@ -216,13 +216,20 @@ Commit message: `feat: build branded shell and queue experience`
 - Create: `apps/client/lib/browser/windows_webview_adapter.dart`
 - Create: `apps/client/lib/browser/download_capture.dart`
 - Create: `apps/client/lib/browser/format_sheet.dart`
+- Create: `apps/client/lib/sharing/shared_url_parser.dart`
+- Create: `apps/client/lib/sharing/shared_text_receiver.dart`
+- Modify: `apps/client/android/app/src/main/AndroidManifest.xml`
+- Modify: `apps/client/android/app/src/main/kotlin/app/episode/downloader/episode_downloader/MainActivity.kt`
 - Test: `apps/client/test/browser/browser_controller_test.dart`
 - Test: `apps/client/test/browser/download_capture_test.dart`
+- Test: `apps/client/test/sharing/shared_url_parser_test.dart`
+- Test: `apps/client/test/sharing/shared_text_receiver_test.dart`
 - Test: `apps/client/integration_test/browser_survival_test.dart`
 
 **Interfaces:**
 - Consumes: `JobGateway.create`, `JobRepository.upsert`, and generated `Download.png`.
 - Produces: `BrowserAdapter.currentUrl`, `navigate`, `back`, `forward`, `reload`, `openTab`, `closeTab`, `cookiesFor(Uri)`; `DownloadCapture.submit(Uri, JobFormat)`.
+- Produces: Android `ACTION_SEND` text handling that validates the first HTTPS URL and routes it to the existing format sheet.
 
 - [ ] **Step 1: Write failing browser-controller tests**
 
@@ -243,6 +250,8 @@ Use the generated full-color download image and maintain browser state when Queu
 - [ ] **Step 5: Add browser survival integration test**
 
 Navigate a local fixture, set a cookie and form value, switch Browser → Queue → Browser, and assert URL, cookie, and form state remain.
+
+Add Android share-target tests for plain-text shares, mixed text plus a URL, unsafe/malformed input, cold launch, and delivery to an already-running app. The share flow must reuse the normal format selector rather than create a separate download path.
 
 - [ ] **Step 6: Run browser tests**
 
@@ -578,7 +587,7 @@ Expected: zero lint errors, all tests PASS, Android APK and Windows installer ar
 
 - [ ] **Step 5: Perform Android acceptance**
 
-On a real Android device, verify independent login persistence, browser survival, floating capture, both formats, background notification progress, completion, local file opening, failure, cancel, retry, history clear, and re-download.
+On a real Android device, verify independent login persistence, browser survival, floating capture, both formats, sharing a link from TikTok/Facebook into the format selector on cold and warm launch, background notification progress, completion, local file opening, failure, cancel, retry, history clear, and re-download.
 
 - [ ] **Step 6: Perform Windows acceptance**
 

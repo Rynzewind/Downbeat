@@ -79,6 +79,8 @@ The Browser view places a floating circular button above the lower-right edge us
 - **MP3 — Audio only**
 - **Cancel**
 
+On Android, the app also registers as a target for shared plain-text links. Sharing from apps such as TikTok or Facebook launches Episode Downloader, extracts the first valid HTTPS URL, opens that URL as the active browser target, and immediately presents the same MP4/MP3 selector. Malformed text and non-HTTPS URLs are rejected. If the source requires an authenticated session that is unavailable from the external app, the user can continue by opening the target in the app-owned browser and signing in there.
+
 A queue card displays:
 
 - Page/media title.
