@@ -29,6 +29,7 @@ final class Job {
     this.state = JobState.queued,
     this.percent,
     this.message,
+    this.remoteSequence = 0,
   });
 
   final String id;
@@ -40,6 +41,7 @@ final class Job {
   final JobState state;
   final double? percent;
   final String? message;
+  final int remoteSequence;
 
   Job copyWith({
     String? id,
@@ -51,6 +53,7 @@ final class Job {
     JobState? state,
     Object? percent = _unset,
     Object? message = _unset,
+    int? remoteSequence,
   }) => Job(
     id: id ?? this.id,
     sourceUrl: sourceUrl ?? this.sourceUrl,
@@ -63,6 +66,7 @@ final class Job {
         ? this.percent
         : (percent as num?)?.toDouble(),
     message: identical(message, _unset) ? this.message : message as String?,
+    remoteSequence: remoteSequence ?? this.remoteSequence,
   );
 
   Job redownload({required String id, required DateTime createdAt}) => Job(
@@ -71,5 +75,6 @@ final class Job {
     format: format,
     createdAt: createdAt,
     title: title,
+    remoteSequence: 0,
   );
 }

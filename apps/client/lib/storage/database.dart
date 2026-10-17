@@ -32,9 +32,14 @@ final class SqliteJobRepository implements JobRepository {
         state TEXT NOT NULL,
         percent REAL,
         message TEXT,
+        remote_sequence INTEGER NOT NULL DEFAULT 0,
         sort_order INTEGER NOT NULL
       );
     ''');
+    final columns = database.select('PRAGMA table_info(jobs)').map((row) => row['name'] as String).toSet();
+    if (!columns.contains('remote_sequence')) {
+      database.execute('ALTER TABLE jobs ADD COLUMN remote_sequence INTEGER NOT NULL DEFAULT 0');
+    }
     final existing = database.select(
       "SELECT value FROM app_metadata WHERE key = 'device_id'",
     );
@@ -68,6 +73,7 @@ final class SqliteJobRepository implements JobRepository {
           state: JobState.values.byName(row['state'] as String),
           percent: (row['percent'] as num?)?.toDouble(),
           message: row['message'] as String?,
+          remoteSequence: row['remote_sequence'] as int,
         ),
       )
       .toList(growable: false);
@@ -97,8 +103,8 @@ final class SqliteJobRepository implements JobRepository {
       '''
       INSERT INTO jobs(
         id, source_url, format, created_at, title, filename,
-        state, percent, message, sort_order
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        state, percent, message, remote_sequence, sort_order
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         source_url = excluded.source_url,
         format = excluded.format,
@@ -108,6 +114,7 @@ final class SqliteJobRepository implements JobRepository {
         state = excluded.state,
         percent = excluded.percent,
         message = excluded.message
+        ,remote_sequence = excluded.remote_sequence
     ''',
       [
         job.id,
@@ -119,6 +126,7 @@ final class SqliteJobRepository implements JobRepository {
         job.state.name,
         job.percent,
         job.message,
+        job.remoteSequence,
         order,
       ],
     );
@@ -166,6 +174,6 @@ final class SqliteJobRepository implements JobRepository {
 
   Future<void> close() async {
     await _changes.close();
-    _database.dispose();
+    _database.close();
   }
 }
