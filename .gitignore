@@ -1,0 +1,36 @@
+# Synced project references
+sources/
+
+# Isolated worktrees and execution scratch
+.worktrees/
+.superpowers/
+
+# Local toolchains and caches
+.tooling/
+.dart_tool/
+.packages
+.pub-cache/
+node_modules/
+.venv/
+__pycache__/
+.pytest_cache/
+
+# Flutter and platform builds
+build/
+**/android/.gradle/
+**/android/local.properties
+**/windows/flutter/ephemeral/
+
+# Cloud and secrets
+.wrangler/
+.dev.vars
+.env
+*.jks
+*.keystore
+key.properties
+
+# Editors and OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
