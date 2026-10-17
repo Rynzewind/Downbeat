@@ -9,10 +9,7 @@ void main() {
   ) async {
     final repository = MemoryJobRepository();
     await tester.pumpWidget(
-      EpisodeDownloaderApp(
-        repository: repository,
-        simulateProgress: false,
-      ),
+      EpisodeDownloaderApp(repository: repository, simulateProgress: false),
     );
 
     await tester.tap(find.byKey(const Key('download-fab')));
@@ -28,7 +25,9 @@ void main() {
     expect(repository.current.single.format.name, 'mp3');
   });
 
-  testWidgets('shared URL opens the same format picker on launch', (tester) async {
+  testWidgets('shared URL opens the same format picker on launch', (
+    tester,
+  ) async {
     final repository = MemoryJobRepository();
 
     await tester.pumpWidget(

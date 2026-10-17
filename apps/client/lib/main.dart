@@ -24,6 +24,7 @@ Future<void> main() async {
     EpisodeDownloaderApp(
       repository: repository,
       initialSharedUrl: sharedUrl,
+      enableNativeBrowser: !kIsWeb,
     ),
   );
 }

@@ -42,10 +42,10 @@ final class SqliteJobRepository implements JobRepository {
         ? _newDeviceId()
         : existing.first['value'] as String;
     if (existing.isEmpty) {
-      database.execute(
-        'INSERT INTO app_metadata(key, value) VALUES (?, ?)',
-        ['device_id', deviceId],
-      );
+      database.execute('INSERT INTO app_metadata(key, value) VALUES (?, ?)', [
+        'device_id',
+        deviceId,
+      ]);
     }
     return SqliteJobRepository._(database, deviceId);
   }
@@ -82,12 +82,19 @@ final class SqliteJobRepository implements JobRepository {
 
   @override
   Future<void> upsert(Job job) async {
-    final order = _database
-            .select('SELECT sort_order FROM jobs WHERE id = ?', [job.id])
-            .firstOrNull?['sort_order'] as int? ??
-        (_database.select('SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM jobs')
-            .first['n'] as int);
-    _database.execute('''
+    final order =
+        _database.select('SELECT sort_order FROM jobs WHERE id = ?', [
+              job.id,
+            ]).firstOrNull?['sort_order']
+            as int? ??
+        (_database
+                .select(
+                  'SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM jobs',
+                )
+                .first['n']
+            as int);
+    _database.execute(
+      '''
       INSERT INTO jobs(
         id, source_url, format, created_at, title, filename,
         state, percent, message, sort_order
@@ -101,18 +108,20 @@ final class SqliteJobRepository implements JobRepository {
         state = excluded.state,
         percent = excluded.percent,
         message = excluded.message
-    ''', [
-      job.id,
-      job.sourceUrl.toString(),
-      job.format.name,
-      job.createdAt.toIso8601String(),
-      job.title,
-      job.filename,
-      job.state.name,
-      job.percent,
-      job.message,
-      order,
-    ]);
+    ''',
+      [
+        job.id,
+        job.sourceUrl.toString(),
+        job.format.name,
+        job.createdAt.toIso8601String(),
+        job.title,
+        job.filename,
+        job.state.name,
+        job.percent,
+        job.message,
+        order,
+      ],
+    );
     _emit();
   }
 
@@ -121,10 +130,10 @@ final class SqliteJobRepository implements JobRepository {
     _database.execute('BEGIN');
     try {
       for (var index = 0; index < ids.length; index++) {
-        _database.execute(
-          'UPDATE jobs SET sort_order = ? WHERE id = ?',
-          [index, ids[index]],
-        );
+        _database.execute('UPDATE jobs SET sort_order = ? WHERE id = ?', [
+          index,
+          ids[index],
+        ]);
       }
       _database.execute('COMMIT');
     } catch (_) {
@@ -147,10 +156,11 @@ final class SqliteJobRepository implements JobRepository {
 
   @override
   Future<void> clearFinished() async {
-    _database.execute(
-      'DELETE FROM jobs WHERE state IN (?, ?, ?)',
-      [JobState.completed.name, JobState.failed.name, JobState.cancelled.name],
-    );
+    _database.execute('DELETE FROM jobs WHERE state IN (?, ?, ?)', [
+      JobState.completed.name,
+      JobState.failed.name,
+      JobState.cancelled.name,
+    ]);
     _emit();
   }
 

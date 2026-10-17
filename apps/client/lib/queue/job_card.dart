@@ -8,26 +8,26 @@ final class JobCard extends StatelessWidget {
   final Job job;
 
   String get _status => switch (job.state) {
-        JobState.queued => 'Queued',
-        JobState.fetching => 'Fetching info',
-        JobState.downloading => 'Downloading',
-        JobState.converting => 'Converting',
-        JobState.paused => 'Paused',
-        JobState.completed => 'Completed',
-        JobState.failed => 'Failed',
-        JobState.cancelled => 'Cancelled',
-      };
+    JobState.queued => 'Queued',
+    JobState.fetching => 'Fetching info',
+    JobState.downloading => 'Downloading',
+    JobState.converting => 'Converting',
+    JobState.paused => 'Paused',
+    JobState.completed => 'Completed',
+    JobState.failed => 'Failed',
+    JobState.cancelled => 'Cancelled',
+  };
 
   Color get _color => switch (job.state) {
-        JobState.queued => AppColors.queued,
-        JobState.fetching => AppColors.cyan,
-        JobState.downloading => AppColors.blue,
-        JobState.converting => AppColors.magenta,
-        JobState.paused => AppColors.warning,
-        JobState.completed => AppColors.success,
-        JobState.failed => AppColors.failure,
-        JobState.cancelled => AppColors.queued,
-      };
+    JobState.queued => AppColors.queued,
+    JobState.fetching => AppColors.cyan,
+    JobState.downloading => AppColors.blue,
+    JobState.converting => AppColors.magenta,
+    JobState.paused => AppColors.warning,
+    JobState.completed => AppColors.success,
+    JobState.failed => AppColors.failure,
+    JobState.cancelled => AppColors.queued,
+  };
 
   @override
   Widget build(BuildContext context) {

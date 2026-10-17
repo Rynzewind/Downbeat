@@ -14,9 +14,9 @@ void main() {
   test('reads and validates the initial Android shared text', () async {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (call) async {
-      expect(call.method, 'getInitialSharedText');
-      return 'Shared from Facebook https://facebook.com/watch/?v=123';
-    });
+          expect(call.method, 'getInitialSharedText');
+          return 'Shared from Facebook https://facebook.com/watch/?v=123';
+        });
 
     final url = await const SharedTextReceiver().initialUrl();
 

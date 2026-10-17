@@ -18,7 +18,9 @@ void main() {
     );
 
     await tester.pumpWidget(
-      MaterialApp(home: Scaffold(body: JobCard(job: job))),
+      MaterialApp(
+        home: Scaffold(body: JobCard(job: job)),
+      ),
     );
 
     expect(find.text('Example episode'), findsOneWidget);
@@ -43,13 +45,17 @@ void main() {
     );
 
     await tester.pumpWidget(
-      MaterialApp(home: Scaffold(body: JobCard(job: job))),
+      MaterialApp(
+        home: Scaffold(body: JobCard(job: job)),
+      ),
     );
 
     expect(find.text('Fetching info'), findsOneWidget);
     expect(find.textContaining('%'), findsNothing);
     expect(
-      tester.widget<LinearProgressIndicator>(find.byType(LinearProgressIndicator)).value,
+      tester
+          .widget<LinearProgressIndicator>(find.byType(LinearProgressIndicator))
+          .value,
       isNull,
     );
   });

@@ -9,11 +9,13 @@ final class AppShell extends StatefulWidget {
     required this.repository,
     required this.simulateProgress,
     this.initialSharedUrl,
+    this.enableNativeBrowser = false,
     super.key,
   });
   final JobRepository repository;
   final bool simulateProgress;
   final Uri? initialSharedUrl;
+  final bool enableNativeBrowser;
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -24,32 +26,33 @@ final class _AppShellState extends State<AppShell> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        body: IndexedStack(
-          index: _selected,
-          children: [
-            BrowserPage(
-              repository: widget.repository,
-              simulateProgress: widget.simulateProgress,
-              initialSharedUrl: widget.initialSharedUrl,
-            ),
-            QueuePage(repository: widget.repository),
-          ],
+    body: IndexedStack(
+      index: _selected,
+      children: [
+        BrowserPage(
+          repository: widget.repository,
+          simulateProgress: widget.simulateProgress,
+          initialSharedUrl: widget.initialSharedUrl,
+          enableNativeBrowser: widget.enableNativeBrowser,
         ),
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: _selected,
-          onDestinationSelected: (value) => setState(() => _selected = value),
-          destinations: const [
-            NavigationDestination(
-              icon: Icon(Icons.public_outlined),
-              selectedIcon: Icon(Icons.public),
-              label: 'Browser',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.downloading_outlined),
-              selectedIcon: Icon(Icons.downloading),
-              label: 'Queue',
-            ),
-          ],
+        QueuePage(repository: widget.repository),
+      ],
+    ),
+    bottomNavigationBar: NavigationBar(
+      selectedIndex: _selected,
+      onDestinationSelected: (value) => setState(() => _selected = value),
+      destinations: const [
+        NavigationDestination(
+          icon: Icon(Icons.public_outlined),
+          selectedIcon: Icon(Icons.public),
+          label: 'Browser',
         ),
-      );
+        NavigationDestination(
+          icon: Icon(Icons.downloading_outlined),
+          selectedIcon: Icon(Icons.downloading),
+          label: 'Queue',
+        ),
+      ],
+    ),
+  );
 }

@@ -9,21 +9,24 @@ final class EpisodeDownloaderApp extends StatelessWidget {
     required this.repository,
     this.simulateProgress = true,
     this.initialSharedUrl,
+    this.enableNativeBrowser = false,
     super.key,
   });
   final JobRepository repository;
   final bool simulateProgress;
   final Uri? initialSharedUrl;
+  final bool enableNativeBrowser;
 
   @override
   Widget build(BuildContext context) => MaterialApp(
-        title: 'Downbeat',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.dark,
-        home: AppShell(
-          repository: repository,
-          simulateProgress: simulateProgress,
-          initialSharedUrl: initialSharedUrl,
-        ),
-      );
+    title: 'Downbeat',
+    debugShowCheckedModeBanner: false,
+    theme: AppTheme.dark,
+    home: AppShell(
+      repository: repository,
+      simulateProgress: simulateProgress,
+      initialSharedUrl: initialSharedUrl,
+      enableNativeBrowser: enableNativeBrowser,
+    ),
+  );
 }

@@ -26,13 +26,13 @@ abstract final class JobTransition {
     }
     return switch (event) {
       JobStateChanged(:final state) => job.copyWith(
-          state: state,
-          percent: state == JobState.completed ? 100.0 : job.percent,
-        ),
+        state: state,
+        percent: state == JobState.completed ? 100.0 : job.percent,
+      ),
       JobProgressed(:final state, :final percent) => job.copyWith(
-          state: state,
-          percent: percent?.clamp(0, 100).toDouble(),
-        ),
+        state: state,
+        percent: percent?.clamp(0, 100).toDouble(),
+      ),
     };
   }
 }
