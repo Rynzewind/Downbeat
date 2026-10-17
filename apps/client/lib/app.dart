@@ -17,7 +17,7 @@ final class EpisodeDownloaderApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => MaterialApp(
-        title: 'Episode Downloader',
+        title: 'Downbeat',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.dark,
         home: AppShell(

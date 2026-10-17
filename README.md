@@ -1,4 +1,4 @@
-# Episode Downloader
+# Downbeat
 
 Personal Android and Windows media downloader with an in-app browser, device-local queue, and cloud processing.
 

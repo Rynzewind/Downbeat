@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:episode_downloader/jobs/job.dart';
 import 'package:episode_downloader/jobs/job_repository.dart';
+import 'package:episode_downloader/storage/database.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -47,5 +50,49 @@ void main() {
     );
 
     expect(() => repository.remove('1'), throwsStateError);
+  });
+
+  test('persists jobs, ordering, and device identity across reopen', () async {
+    final directory = await Directory.systemTemp.createTemp('downbeat-db-');
+    addTearDown(() => directory.delete(recursive: true));
+    final path = '${directory.path}${Platform.pathSeparator}queue.sqlite';
+
+    final first = await SqliteJobRepository.open(path);
+    final deviceId = first.deviceId;
+    await first.upsert(
+      Job(
+        id: 'one',
+        sourceUrl: Uri.parse('https://example.com/one'),
+        format: JobFormat.mp4,
+        title: 'First',
+        createdAt: DateTime.utc(2026),
+      ),
+    );
+    await first.upsert(
+      Job(
+        id: 'two',
+        sourceUrl: Uri.parse('https://example.com/two'),
+        format: JobFormat.mp3,
+        state: JobState.completed,
+        filename: 'two.mp3',
+        createdAt: DateTime.utc(2026, 1, 2),
+      ),
+    );
+    await first.reorder(const ['two', 'one']);
+    await first.close();
+
+    final reopened = await SqliteJobRepository.open(path);
+    addTearDown(reopened.close);
+
+    expect(reopened.deviceId, deviceId);
+    expect(
+      await reopened.watchAll().first,
+      hasLength(2),
+    );
+    expect(
+      (await reopened.watchAll().first).map((job) => job.id),
+      ['two', 'one'],
+    );
+    expect((await reopened.watchAll().first).first.filename, 'two.mp3');
   });
 }

@@ -1,6 +1,6 @@
 {
-    "name": "episode_downloader",
-    "short_name": "episode_downloader",
+    "name": "Downbeat",
+    "short_name": "Downbeat",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

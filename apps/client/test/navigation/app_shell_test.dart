@@ -4,6 +4,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  testWidgets('uses Downbeat as the product name', (tester) async {
+    await tester.pumpWidget(
+      EpisodeDownloaderApp(repository: MemoryJobRepository()),
+    );
+
+    final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
+    expect(app.title, 'Downbeat');
+  });
+
   testWidgets('switches between persistent Browser and Queue destinations', (
     tester,
   ) async {
