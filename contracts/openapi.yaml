@@ -1,0 +1,85 @@
+openapi: 3.1.0
+info:
+  title: Episode Downloader API
+  version: 0.1.0
+paths:
+  /v1/jobs:
+    post:
+      operationId: createJob
+  /v1/jobs/{jobId}:
+    get:
+      operationId: getJob
+  /v1/jobs/{jobId}/commands:
+    post:
+      operationId: commandJob
+  /v1/jobs/{jobId}/events:
+    get:
+      operationId: streamJobEvents
+  /v1/jobs/{jobId}/delivery:
+    post:
+      operationId: acknowledgeDelivery
+  /v1/releases/{platform}:
+    get:
+      operationId: getRelease
+components:
+  schemas:
+    JobFormat:
+      type: string
+      enum: [mp4, mp3]
+    JobState:
+      type: string
+      enum:
+        - queued
+        - fetching
+        - downloading
+        - converting
+        - paused
+        - completed
+        - failed
+        - cancelled
+    JobCommand:
+      type: string
+      enum: [cancel, pause, resume, retry]
+    JobCreateRequest:
+      type: object
+      required: [clientRequestId, url, format]
+      properties:
+        clientRequestId: { type: string }
+        url: { type: string, format: uri }
+        format: { $ref: '#/components/schemas/JobFormat' }
+        cookies:
+          type: array
+          description: Ephemeral domain-scoped cookies; never persisted.
+          items: { type: string }
+    ProgressEvent:
+      type: object
+      required: [jobId, sequence, state]
+      properties:
+        jobId: { type: string }
+        sequence: { type: integer, minimum: 0 }
+        state: { $ref: '#/components/schemas/JobState' }
+        percent: { type: [number, 'null'], minimum: 0, maximum: 100 }
+        transferredBytes: { type: [integer, 'null'], minimum: 0 }
+        message: { type: [string, 'null'] }
+    JobRecord:
+      allOf:
+        - $ref: '#/components/schemas/ProgressEvent'
+        - type: object
+          required: [sourceUrl, format]
+          properties:
+            sourceUrl: { type: string, format: uri }
+            format: { $ref: '#/components/schemas/JobFormat' }
+            title: { type: [string, 'null'] }
+            filename: { type: [string, 'null'] }
+    DeliveryAck:
+      type: object
+      required: [size, sha256]
+      properties:
+        size: { type: integer, minimum: 0 }
+        sha256: { type: string, pattern: '^[a-fA-F0-9]{64}$' }
+    ApiError:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: string }
+        message: { type: string }

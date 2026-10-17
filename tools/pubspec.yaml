@@ -1,0 +1,9 @@
+name: episode_downloader_tools
+publish_to: none
+environment:
+  sdk: ^3.13.5
+dependencies:
+  image: ^4.5.4
+  path: ^1.9.1
+dev_dependencies:
+  test: ^1.26.3

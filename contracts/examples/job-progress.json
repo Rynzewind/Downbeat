@@ -1,0 +1,7 @@
+{
+  "jobId": "job_01",
+  "sequence": 4,
+  "state": "downloading",
+  "percent": 42.5,
+  "transferredBytes": 8912896
+}

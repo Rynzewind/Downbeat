@@ -1,0 +1,8 @@
+{
+  "jobId": "job_01",
+  "sequence": 0,
+  "state": "queued",
+  "sourceUrl": "https://example.com/watch/1",
+  "format": "mp4",
+  "percent": null
+}
