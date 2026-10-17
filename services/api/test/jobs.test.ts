@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createApi } from '../src/index.ts';
+import { MemoryJobStore } from '../src/jobs/job-object.ts';
 
 const token = 'device-secret';
 const api = () => createApi({ authenticate: value => value === token ? 'phone-1' : null });
@@ -42,4 +43,17 @@ test('hides jobs belonging to another device', async () => {
   const { jobId } = await created.json() as any;
   const response = await service.fetch(request(`/v1/jobs/${jobId}`, { headers: { authorization: 'Bearer two' } }));
   assert.equal(response.status, 404);
+});
+
+test('events endpoint resumes after the supplied sequence', async () => {
+  const store = new MemoryJobStore();
+  const service = createApi({ authenticate: () => 'phone-1', store });
+  const created = await service.fetch(request('/v1/jobs', { method: 'POST', headers: auth, body: JSON.stringify({ clientRequestId: 'events', sourceUrl: 'https://example.com/v', format: 'mp4' }) }));
+  const { jobId } = await created.json() as any;
+  store.publish(jobId, { state: 'fetching', percent: null });
+  store.publish(jobId, { state: 'downloading', percent: 40 });
+  const response = await service.fetch(request(`/v1/jobs/${jobId}/events?after=1`, { headers: auth }));
+  assert.equal(response.status, 200);
+  const body = await response.json() as any;
+  assert.deepEqual(body.events.map((event: any) => event.sequence), [2]);
 });
