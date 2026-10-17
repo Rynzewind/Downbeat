@@ -1,8 +1,15 @@
 [project]
-name = "episode-downloader-processor"
+name = "downbeat-processor"
 version = "0.1.0"
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+  "fastapi>=0.116,<1",
+  "uvicorn[standard]>=0.35,<1",
+  "yt-dlp>=2026.1.1",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8.4,<10"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
