@@ -51,8 +51,8 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
         activeJobId = jobId
         ContextCompat.startForegroundService(context, Intent(context, DownbeatDownloadService::class.java))
         emit(mapOf("jobId" to jobId, "type" to "stage", "stage" to "fetching", "message" to "Finding media"))
-        active = YtDlp.executeAsync(request) { progress, _, line ->
-            emit(mapOf("jobId" to jobId, "type" to "progress", "stage" to "downloading", "percent" to progress, "bytesReceived" to 0, "message" to line.take(120)))
+        active = YtDlp.executeAsync(request) { progress, _, _ ->
+            emit(mapOf("jobId" to jobId, "type" to "progress", "stage" to "downloading", "percent" to progress, "bytesReceived" to 0))
             notify("Downloading ${progress.toInt()}%", progress.toInt())
         }
         Thread {

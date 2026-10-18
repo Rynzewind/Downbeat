@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../jobs/job.dart';
 import '../jobs/job_repository.dart';
 import '../processing/local_job_coordinator.dart';
+import '../delivery/output_opener.dart';
 import 'job_card.dart';
 
 final class QueuePage extends StatelessWidget {
@@ -70,6 +71,7 @@ final class QueuePage extends StatelessWidget {
                     onCancel: coordinator == null ? null : () => coordinator!.cancel(job.id),
                     onRetry: coordinator == null ? null : () => coordinator!.retry(job.id),
                     onRedownload: coordinator == null ? null : () => coordinator!.redownload(job.id),
+                    onOpen: job.outputPath == null ? null : () => const OutputOpener().open(job.outputPath!),
                     onRemove: job.state.isActive ? null : () => repository.remove(job.id),
                   );
                 },

@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 
 import 'app.dart';
 import 'delivery/file_delivery.dart';
+import 'delivery/android_file_delivery.dart';
 import 'processing/android_local_processor.dart';
 import 'processing/local_job_coordinator.dart';
 import 'processing/windows_local_processor.dart';
@@ -21,7 +22,7 @@ Future<void> main() async {
   LocalJobCoordinator? coordinator;
   if (!kIsWeb) {
     final support = await getApplicationSupportDirectory();
-    final downloads = await getDownloadsDirectory();
+    final downloads = Platform.isWindows ? await getDownloadsDirectory() : null;
     final processor = Platform.isWindows
         ? WindowsLocalProcessor(
             runtimeDirectory: p.join(
@@ -34,9 +35,11 @@ Future<void> main() async {
       processor: processor,
       repository: repository,
       workspaceRoot: p.join(support.path, 'jobs'),
-      publishArtifact: downloads == null
-          ? null
-          : FileDelivery(destinationDirectory: downloads).deliver,
+      publishArtifact: Platform.isAndroid
+          ? const AndroidFileDelivery().deliver
+          : downloads == null
+              ? null
+              : FileDelivery(destinationDirectory: downloads).deliver,
     );
     await coordinator.start();
   }

@@ -17,9 +17,18 @@ final class JobWorkspace {
     return JobWorkspace._(directory.path);
   }
 
-  Future<String> writeCookieFile(String contents) async {
+  Future<String> writeCookieFile(Uri source, String contents) async {
     final file = File(p.join(path, 'cookies.txt'));
-    await file.writeAsString(contents, flush: true);
+    final lines = <String>['# Netscape HTTP Cookie File'];
+    for (final part in contents.split(';')) {
+      final separator = part.indexOf('=');
+      if (separator <= 0) continue;
+      final name = part.substring(0, separator).trim();
+      final value = part.substring(separator + 1).trim();
+      if (name.isEmpty || name.contains(RegExp(r'[\t\r\n]')) || value.contains(RegExp(r'[\t\r\n]'))) continue;
+      lines.add('${source.host}\tFALSE\t/\t${source.scheme == 'https' ? 'TRUE' : 'FALSE'}\t0\t$name\t$value');
+    }
+    await file.writeAsString('${lines.join('\n')}\n', flush: true);
     return file.path;
   }
 

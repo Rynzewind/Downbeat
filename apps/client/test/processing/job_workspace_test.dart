@@ -11,9 +11,9 @@ void main() {
     });
 
     final workspace = await JobWorkspace.create(root.path, 'job-1');
-    final cookiePath = await workspace.writeCookieFile('session=secret');
+    final cookiePath = await workspace.writeCookieFile(Uri.parse('https://example.com/watch'), 'session=secret');
 
-    expect(await File(cookiePath).readAsString(), 'session=secret');
+    expect(await File(cookiePath).readAsString(), contains('example.com\tFALSE\t/\tTRUE\t0\tsession\tsecret'));
     expect(cookiePath, startsWith(workspace.path));
 
     await Future.wait([workspace.cleanup(), workspace.cleanup()]);

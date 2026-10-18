@@ -25,11 +25,13 @@ function Test-BuildInputs {
   if ((Get-Content -Raw (Join-Path $client 'pubspec.yaml')) -notmatch 'name: downbeat') { throw 'Downbeat branding is missing' }
 }
 
+if (-not $UseExistingBuilds) {
+  & (Join-Path $root 'tools\fetch_windows_runtime.ps1')
+}
 Test-BuildInputs
 if ($PreflightOnly) { Write-Host 'Downbeat packaging preflight passed'; exit 0 }
 
 if (-not $UseExistingBuilds) {
-  & (Join-Path $root 'tools\fetch_windows_runtime.ps1')
   Push-Location $client
   try {
     & $flutter test

@@ -156,7 +156,7 @@ final class LocalJobCoordinator {
     String? cookiePath;
     final cookieHeader = _cookieHeaders.remove(initial.id);
     if (cookieHeader != null && cookieHeader.isNotEmpty) {
-      cookiePath = await workspace.writeCookieFile(cookieHeader);
+      cookiePath = await workspace.writeCookieFile(initial.sourceUrl, cookieHeader);
     }
     var job = initial.copyWith(
       state: JobState.fetching,

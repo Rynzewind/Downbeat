@@ -97,6 +97,11 @@ final class JobCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(_status, style: TextStyle(color: _color)),
+                  if (job.message != null && job.message != _status)
+                    Text(
+                      job.message!,
+                      style: const TextStyle(color: Colors.white70, fontSize: 12),
+                    ),
                   if (_bytes != null) Text(_bytes!, style: const TextStyle(color: Colors.white54, fontSize: 12)),
                   const SizedBox(height: 7),
                   LinearProgressIndicator(
