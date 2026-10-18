@@ -150,7 +150,6 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
     private fun configureSiteOptions(request: YtDlpRequest, url: String) {
         val host = runCatching { android.net.Uri.parse(url).host.orEmpty().lowercase() }.getOrDefault("")
         if (host == "youtube.com" || host.endsWith(".youtube.com") || host == "youtu.be") {
-            request.addOption("--extractor-args", "youtube:player_client=visionos")
             request.addOption("--remote-components", "ejs:github")
         }
     }

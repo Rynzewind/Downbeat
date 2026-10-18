@@ -30,7 +30,13 @@ final class _NativeBrowserSurfaceState extends State<NativeBrowserSurface> {
   mobile.WebViewController? _mobile;
   windows.WebviewController? _windows;
   StreamSubscription<String>? _windowsUrlSubscription;
+  Uri? _lastBrowserUrl;
   Object? _error;
+
+  void _reportBrowserUrl(Uri uri) {
+    _lastBrowserUrl = uri;
+    widget.onUrlChanged(uri);
+  }
 
   @override
   void initState() {
@@ -55,7 +61,7 @@ final class _NativeBrowserSurfaceState extends State<NativeBrowserSurface> {
               },
               onUrlChange: (change) {
                 final uri = Uri.tryParse(change.url ?? '');
-                if (uri != null) widget.onUrlChanged(uri);
+                if (uri != null) _reportBrowserUrl(uri);
               },
             ),
           );
@@ -87,7 +93,7 @@ final class _NativeBrowserSurfaceState extends State<NativeBrowserSurface> {
         );
         _windowsUrlSubscription = controller.url.listen((value) {
           final uri = Uri.tryParse(value);
-          if (uri != null && uri.scheme == 'https') widget.onUrlChanged(uri);
+          if (uri != null && uri.scheme == 'https') _reportBrowserUrl(uri);
         });
         await controller.loadUrl(widget.url.toString());
         _windows = controller;
@@ -124,6 +130,7 @@ final class _NativeBrowserSurfaceState extends State<NativeBrowserSurface> {
   void didUpdateWidget(covariant NativeBrowserSurface oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.url == widget.url) return;
+    if (widget.url == _lastBrowserUrl) return;
     if (_mobile != null) unawaited(_mobile!.loadRequest(widget.url));
     if (_windows != null) unawaited(_windows!.loadUrl(widget.url.toString()));
   }
