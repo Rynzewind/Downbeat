@@ -169,13 +169,14 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
 
     private fun configureSiteOptions(request: YtDlpRequest, url: String) {
         val quickJs = File(context.applicationInfo.nativeLibraryDir, "libqjs.so")
-        val options = YouTubeRuntimeOptions.forUrl(url, quickJs.absolutePath)
-        if (options.isEmpty()) return
-        if (!quickJs.isFile) {
-            throw IllegalStateException("Bundled QuickJS runtime is missing")
+        val youtubeOptions = YouTubeRuntimeOptions.forUrl(url, quickJs.absolutePath)
+        if (youtubeOptions.isNotEmpty()) {
+            if (!quickJs.isFile) {
+                throw IllegalStateException("Bundled QuickJS runtime is missing")
+            }
+            request.addOption("--verbose")
         }
-        request.addOption("--verbose")
-        options.forEach { (option, value) ->
+        (youtubeOptions + TikTokRequestOptions.forUrl(url)).forEach { (option, value) ->
             request.addOption(option, value)
         }
     }
