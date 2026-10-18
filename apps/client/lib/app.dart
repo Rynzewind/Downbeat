@@ -2,18 +2,19 @@ import 'package:flutter/material.dart';
 
 import 'jobs/job_repository.dart';
 import 'navigation/app_shell.dart';
+import 'processing/local_job_coordinator.dart';
 import 'theme/app_theme.dart';
 
 final class DownbeatApp extends StatelessWidget {
   const DownbeatApp({
     required this.repository,
-    this.simulateProgress = true,
+    this.coordinator,
     this.initialSharedUrl,
     this.enableNativeBrowser = false,
     super.key,
   });
   final JobRepository repository;
-  final bool simulateProgress;
+  final LocalJobCoordinator? coordinator;
   final Uri? initialSharedUrl;
   final bool enableNativeBrowser;
 
@@ -24,7 +25,7 @@ final class DownbeatApp extends StatelessWidget {
     theme: AppTheme.dark,
     home: AppShell(
       repository: repository,
-      simulateProgress: simulateProgress,
+      coordinator: coordinator,
       initialSharedUrl: initialSharedUrl,
       enableNativeBrowser: enableNativeBrowser,
     ),

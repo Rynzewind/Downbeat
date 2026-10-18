@@ -4,8 +4,20 @@ import '../jobs/job.dart';
 import '../theme/app_theme.dart';
 
 final class JobCard extends StatelessWidget {
-  const JobCard({required this.job, super.key});
+  const JobCard({required this.job, this.onCancel, this.onRetry, this.onRedownload, this.onOpen, this.onRemove, super.key});
   final Job job;
+  final VoidCallback? onCancel;
+  final VoidCallback? onRetry;
+  final VoidCallback? onRedownload;
+  final VoidCallback? onOpen;
+  final VoidCallback? onRemove;
+
+  String? get _bytes {
+    if (job.bytesReceived <= 0) return null;
+    final received = (job.bytesReceived / 1048576).toStringAsFixed(1);
+    if (job.totalBytes == null || job.totalBytes! <= 0) return '$received MB';
+    return '$received / ${(job.totalBytes! / 1048576).toStringAsFixed(1)} MB';
+  }
 
   String get _status => switch (job.state) {
     JobState.queued => 'Queued',
@@ -85,6 +97,7 @@ final class JobCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(_status, style: TextStyle(color: _color)),
+                  if (_bytes != null) Text(_bytes!, style: const TextStyle(color: Colors.white54, fontSize: 12)),
                   const SizedBox(height: 7),
                   LinearProgressIndicator(
                     value: job.percent == null ? null : job.percent! / 100,
@@ -93,6 +106,14 @@ final class JobCard extends StatelessWidget {
                     color: _color,
                     backgroundColor: Colors.white10,
                   ),
+                  const SizedBox(height: 8),
+                  Wrap(spacing: 8, children: [
+                    if (job.state.isActive && onCancel != null) TextButton(onPressed: onCancel, child: const Text('Cancel')),
+                    if ((job.state == JobState.failed || job.state == JobState.cancelled) && onRetry != null) TextButton(onPressed: onRetry, child: const Text('Retry')),
+                    if (job.state == JobState.completed && onRedownload != null) TextButton(onPressed: onRedownload, child: const Text('Redownload')),
+                    if (job.state == JobState.completed && job.outputPath != null && onOpen != null) TextButton(onPressed: onOpen, child: const Text('Open')),
+                    if (job.state.isTerminal && onRemove != null) TextButton(onPressed: onRemove, child: const Text('Remove')),
+                  ]),
                 ],
               ),
             ),

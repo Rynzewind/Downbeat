@@ -2,12 +2,14 @@ import 'dart:async';
 
 import '../jobs/job.dart';
 import '../jobs/job_repository.dart';
+import '../delivery/file_delivery.dart';
 import 'job_workspace.dart';
 import 'local_processor.dart';
 import 'processing_event.dart';
 
 typedef JobIdFactory = String Function();
 typedef Clock = DateTime Function();
+typedef ArtifactPublisher = Future<DeliveredFile> Function(ProcessorArtifact artifact);
 
 final class LocalJobCoordinator {
   LocalJobCoordinator({
@@ -16,6 +18,7 @@ final class LocalJobCoordinator {
     required this.workspaceRoot,
     JobIdFactory? newId,
     Clock? now,
+    this.publishArtifact,
   }) : _newId = newId ?? _defaultId,
        _now = now ?? _defaultNow;
 
@@ -24,6 +27,7 @@ final class LocalJobCoordinator {
   final String workspaceRoot;
   final JobIdFactory _newId;
   final Clock _now;
+  final ArtifactPublisher? publishArtifact;
   final List<String> _pending = [];
   final Map<String, String?> _cookieHeaders = {};
   final Map<String, JobWorkspace> _workspaces = {};
@@ -173,7 +177,7 @@ final class LocalJobCoordinator {
       await for (final event in processor.run(request)) {
         final current = await _find(job.id);
         if (current == null || current.state == JobState.cancelled) break;
-        job = _apply(current, event);
+        job = await _apply(current, event);
         await repository.upsert(job);
       }
       final current = await _find(job.id);
@@ -203,7 +207,7 @@ final class LocalJobCoordinator {
     }
   }
 
-  Job _apply(Job job, ProcessingEvent event) {
+  Future<Job> _apply(Job job, ProcessingEvent event) async {
     final sequence = job.localSequence + 1;
     switch (event.type) {
       case ProcessingEventType.stage:
@@ -222,13 +226,27 @@ final class LocalJobCoordinator {
           localSequence: sequence,
         );
       case ProcessingEventType.artifact:
+        final publisher = publishArtifact;
+        var path = event.artifactPath!;
+        var size = event.artifactSize!;
+        if (publisher != null) {
+          final delivered = await publisher(ProcessorArtifact(
+            path: path,
+            filename: event.filename!,
+            mediaType: event.mediaType!,
+            size: size,
+            sha256: event.sha256,
+          ));
+          path = delivered.path;
+          size = delivered.size;
+        }
         return job.copyWith(
           state: JobState.completed,
           percent: 100,
           filename: event.filename,
-          outputPath: event.artifactPath,
-          bytesReceived: event.artifactSize,
-          totalBytes: event.artifactSize,
+          outputPath: path,
+          bytesReceived: size,
+          totalBytes: size,
           message: 'Completed',
           localSequence: sequence,
         );

@@ -3,17 +3,18 @@ import 'package:flutter/material.dart';
 import '../browser/browser_page.dart';
 import '../jobs/job_repository.dart';
 import '../queue/queue_page.dart';
+import '../processing/local_job_coordinator.dart';
 
 final class AppShell extends StatefulWidget {
   const AppShell({
     required this.repository,
-    required this.simulateProgress,
+    this.coordinator,
     this.initialSharedUrl,
     this.enableNativeBrowser = false,
     super.key,
   });
   final JobRepository repository;
-  final bool simulateProgress;
+  final LocalJobCoordinator? coordinator;
   final Uri? initialSharedUrl;
   final bool enableNativeBrowser;
 
@@ -31,11 +32,11 @@ final class _AppShellState extends State<AppShell> {
       children: [
         BrowserPage(
           repository: widget.repository,
-          simulateProgress: widget.simulateProgress,
+          coordinator: widget.coordinator,
           initialSharedUrl: widget.initialSharedUrl,
           enableNativeBrowser: widget.enableNativeBrowser,
         ),
-        QueuePage(repository: widget.repository),
+        QueuePage(repository: widget.repository, coordinator: widget.coordinator),
       ],
     ),
     bottomNavigationBar: NavigationBar(

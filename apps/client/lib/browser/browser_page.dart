@@ -1,10 +1,8 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import '../jobs/job.dart';
 import '../jobs/job_repository.dart';
-import '../jobs/job_transition.dart';
+import '../processing/local_job_coordinator.dart';
 import '../theme/app_theme.dart';
 import 'browser_controller.dart';
 import 'native_browser_surface.dart';
@@ -12,13 +10,13 @@ import 'native_browser_surface.dart';
 final class BrowserPage extends StatefulWidget {
   const BrowserPage({
     required this.repository,
-    required this.simulateProgress,
+    this.coordinator,
     this.initialSharedUrl,
     this.enableNativeBrowser = false,
     super.key,
   });
   final JobRepository repository;
-  final bool simulateProgress;
+  final LocalJobCoordinator? coordinator;
   final Uri? initialSharedUrl;
   final bool enableNativeBrowser;
 
@@ -72,46 +70,18 @@ final class _BrowserPageState extends State<BrowserPage>
       builder: (context) => const _FormatSheet(),
     );
     if (format == null) return;
-    final id = DateTime.now().microsecondsSinceEpoch.toString();
-    final job = Job(
-      id: id,
-      sourceUrl: _current,
-      format: format,
-      title: _current.host,
-      createdAt: DateTime.now().toUtc(),
-    );
-    await widget.repository.upsert(job);
-    if (widget.simulateProgress) unawaited(_simulate(job));
-  }
-
-  Future<void> _simulate(Job initial) async {
-    var job = initial;
-    await Future<void>.delayed(const Duration(milliseconds: 350));
-    job = JobTransition.apply(
-      job,
-      const JobEvent.stateChanged(JobState.fetching),
-    );
-    await widget.repository.upsert(job);
-    for (final percent in <double>[8, 24, 48, 73, 92]) {
-      await Future<void>.delayed(const Duration(milliseconds: 300));
-      job = JobTransition.apply(
-        job,
-        JobEvent.progress(JobState.downloading, percent),
-      );
-      await widget.repository.upsert(job);
+    final coordinator = widget.coordinator;
+    if (coordinator != null) {
+      await coordinator.submit(_current, format);
+    } else {
+      await widget.repository.upsert(Job(
+        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        sourceUrl: _current,
+        format: format,
+        title: _current.host,
+        createdAt: DateTime.now().toUtc(),
+      ));
     }
-    await Future<void>.delayed(const Duration(milliseconds: 250));
-    job = JobTransition.apply(
-      job,
-      const JobEvent.progress(JobState.converting, null),
-    );
-    await widget.repository.upsert(job);
-    await Future<void>.delayed(const Duration(milliseconds: 500));
-    job = JobTransition.apply(
-      job,
-      const JobEvent.stateChanged(JobState.completed),
-    ).copyWith(filename: 'download.${job.format.name}');
-    await widget.repository.upsert(job);
   }
 
   @override
@@ -268,13 +238,13 @@ final class _FormatSheet extends StatelessWidget {
           FilledButton.icon(
             onPressed: () => Navigator.pop(context, JobFormat.mp4),
             icon: const Icon(Icons.movie_creation_outlined),
-            label: const Text('MP4'),
+            label: const Text('Video (MP4)'),
           ),
           const SizedBox(height: 10),
           OutlinedButton.icon(
             onPressed: () => Navigator.pop(context, JobFormat.mp3),
             icon: const Icon(Icons.graphic_eq),
-            label: const Text('MP3'),
+            label: const Text('Audio only (MP3)'),
           ),
         ],
       ),

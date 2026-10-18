@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../jobs/job.dart';
 import '../jobs/job_repository.dart';
+import '../processing/local_job_coordinator.dart';
 import 'job_card.dart';
 
 final class QueuePage extends StatelessWidget {
-  const QueuePage({required this.repository, super.key});
+  const QueuePage({required this.repository, this.coordinator, super.key});
   final JobRepository repository;
+  final LocalJobCoordinator? coordinator;
 
   @override
   Widget build(BuildContext context) => SafeArea(
@@ -61,7 +63,16 @@ final class QueuePage extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
                 itemCount: jobs.length,
                 separatorBuilder: (_, _) => const SizedBox(height: 12),
-                itemBuilder: (_, index) => JobCard(job: jobs[index]),
+                itemBuilder: (_, index) {
+                  final job = jobs[index];
+                  return JobCard(
+                    job: job,
+                    onCancel: coordinator == null ? null : () => coordinator!.cancel(job.id),
+                    onRetry: coordinator == null ? null : () => coordinator!.retry(job.id),
+                    onRedownload: coordinator == null ? null : () => coordinator!.redownload(job.id),
+                    onRemove: job.state.isActive ? null : () => repository.remove(job.id),
+                  );
+                },
               );
             },
           ),

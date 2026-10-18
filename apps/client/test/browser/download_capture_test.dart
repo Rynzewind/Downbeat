@@ -9,16 +9,16 @@ void main() {
   ) async {
     final repository = MemoryJobRepository();
     await tester.pumpWidget(
-      DownbeatApp(repository: repository, simulateProgress: false),
+      DownbeatApp(repository: repository),
     );
 
     await tester.tap(find.byKey(const Key('download-fab')));
     await tester.pumpAndSettle();
     expect(find.text('Choose a format'), findsOneWidget);
-    expect(find.text('MP4'), findsOneWidget);
-    expect(find.text('MP3'), findsOneWidget);
+    expect(find.text('Video (MP4)'), findsOneWidget);
+    expect(find.text('Audio only (MP3)'), findsOneWidget);
 
-    await tester.tap(find.text('MP3'));
+    await tester.tap(find.text('Audio only (MP3)'));
     await tester.pump();
 
     expect(repository.current, hasLength(1));
@@ -33,7 +33,6 @@ void main() {
     await tester.pumpWidget(
       DownbeatApp(
         repository: repository,
-        simulateProgress: false,
         initialSharedUrl: Uri.parse('https://www.tiktok.com/t/ZExample/'),
       ),
     );
