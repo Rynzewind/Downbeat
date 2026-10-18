@@ -57,7 +57,14 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
         val request = YtDlpRequest(url).setOutputTemplate(output.absolutePath)
             .addOption("--no-playlist")
             .addOption("--no-part")
-            .addOption("--format", if (format == "mp3") "bestaudio/best" else "bestvideo[ext=mp4][vcodec^=avc1][height<=720]/bestvideo[ext=mp4][height<=720]/bestvideo[height<=720]")
+            .addOption(
+                "--format",
+                if (format == "mp3") {
+                    "bestaudio/best"
+                } else {
+                    "bestvideo[ext=mp4][vcodec^=avc1][height<=720]/bestvideo[ext=mp4][height<=720]/bestvideo[height<=720]/best[ext=mp4][height<=720]/best[height<=720]/best"
+                }
+            )
         configureSiteOptions(request, url)
         if (cookies != null) request.addOption("--cookies", cookies)
         activeJobId = jobId
@@ -155,12 +162,12 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
             "sign in" in value || "not a bot" in value || "cookies" in value ->
                 "authentication" to "This site needs a signed-in browser session. Sign in inside Downbeat, then try again."
             "private video" in value -> "authentication" to "This video is private or your Downbeat browser is not signed in to the account that can view it."
+            "requested format" in value ->
+                "format" to "That video does not offer a compatible stream. Try the other format."
             "video unavailable" in value || "not available" in value ->
                 "unavailable" to "This video is unavailable to this device or account."
             "geo" in value || "country" in value ->
                 "unavailable" to "This video is not available in your current region."
-            "requested format" in value ->
-                "format" to "That video does not offer a compatible stream. Try the other format."
             "javascript" in value || "js runtime" in value || "signature" in value ->
                 "extractor" to "YouTube changed its player. This Downbeat build needs an extractor update."
             "unsatisfiedlink" in value || "native" in value && "load" in value ->

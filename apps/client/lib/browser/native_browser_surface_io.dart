@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart' as mobile;
+import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'package:webview_windows/webview_windows.dart' as windows;
 
 import 'browser_controller.dart';
@@ -58,6 +59,15 @@ final class _NativeBrowserSurfaceState extends State<NativeBrowserSurface> {
               },
             ),
           );
+        final androidController = controller.platform;
+        final cookieManager = mobile.WebViewCookieManager().platform;
+        if (androidController is AndroidWebViewController &&
+            cookieManager is AndroidWebViewCookieManager) {
+          await cookieManager.setAcceptThirdPartyCookies(
+            androidController,
+            true,
+          );
+        }
         await controller.loadRequest(widget.url);
         _mobile = controller;
         widget.navigationController.attach(
@@ -97,7 +107,8 @@ final class _NativeBrowserSurfaceState extends State<NativeBrowserSurface> {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             unawaited(
               const MethodChannel('app.downbeat/browser')
-                  .invokeMethod<void>('configureBrowser'),
+                  .invokeMethod<void>('configureBrowser')
+                  .then((_) => _mobile?.reload()),
             );
           });
         }
