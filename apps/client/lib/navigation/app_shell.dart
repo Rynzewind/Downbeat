@@ -4,6 +4,7 @@ import '../browser/browser_page.dart';
 import '../jobs/job_repository.dart';
 import '../queue/queue_page.dart';
 import '../processing/local_job_coordinator.dart';
+import '../settings/settings_page.dart';
 
 final class AppShell extends StatefulWidget {
   const AppShell({
@@ -40,7 +41,11 @@ final class _AppShellState extends State<AppShell> {
           enableNativeBrowser: widget.enableNativeBrowser,
           onJobSubmitted: () => setState(() => _selected = 1),
         ),
-        QueuePage(repository: widget.repository, coordinator: widget.coordinator),
+        QueuePage(
+          repository: widget.repository,
+          coordinator: widget.coordinator,
+        ),
+        const SettingsPage(),
       ],
     ),
     bottomNavigationBar: NavigationBar(
@@ -56,6 +61,11 @@ final class _AppShellState extends State<AppShell> {
           icon: Icon(Icons.downloading_outlined),
           selectedIcon: Icon(Icons.downloading),
           label: 'Queue',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.settings_outlined),
+          selectedIcon: Icon(Icons.settings),
+          label: 'Settings',
         ),
       ],
     ),

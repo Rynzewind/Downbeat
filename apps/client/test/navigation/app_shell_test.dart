@@ -5,9 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   testWidgets('uses Downbeat as the product name', (tester) async {
-    await tester.pumpWidget(
-      DownbeatApp(repository: MemoryJobRepository()),
-    );
+    await tester.pumpWidget(DownbeatApp(repository: MemoryJobRepository()));
 
     final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
     expect(app.title, 'Downbeat');
@@ -16,9 +14,7 @@ void main() {
   testWidgets('switches between persistent Browser and Queue destinations', (
     tester,
   ) async {
-    await tester.pumpWidget(
-      DownbeatApp(repository: MemoryJobRepository()),
-    );
+    await tester.pumpWidget(DownbeatApp(repository: MemoryJobRepository()));
 
     expect(find.text('Browse'), findsOneWidget);
     expect(find.byKey(const Key('browser-address')), findsOneWidget);
@@ -30,5 +26,10 @@ void main() {
     await tester.tap(find.text('Browser'));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('browser-address')), findsOneWidget);
+
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+    expect(find.text('Download location'), findsOneWidget);
+    expect(find.text('Downloads'), findsOneWidget);
   });
 }

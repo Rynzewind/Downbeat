@@ -40,6 +40,7 @@ android {
 }
 
 dependencies {
+    implementation("androidx.documentfile:documentfile:1.1.0")
     implementation("dev.ffmpegkit-maintained:yt-dlp-android:2.0.2")
     implementation("dev.ffmpegkit-maintained:ffmpeg-kit-full:8.1.9")
 }
