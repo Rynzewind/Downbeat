@@ -5,6 +5,7 @@ import '../jobs/job_repository.dart';
 import '../delivery/file_delivery.dart';
 import 'job_workspace.dart';
 import 'local_processor.dart';
+import 'media_filename.dart';
 import 'processing_event.dart';
 
 typedef JobIdFactory = String Function();
@@ -64,6 +65,8 @@ final class LocalJobCoordinator {
     Uri sourceUrl,
     JobFormat format, {
     String? cookieHeader,
+    String? title,
+    String? artist,
   }) async {
     if (sourceUrl.scheme != 'https' || sourceUrl.host.isEmpty) {
       throw ArgumentError.value(sourceUrl, 'sourceUrl', 'HTTPS URL required');
@@ -73,7 +76,8 @@ final class LocalJobCoordinator {
       sourceUrl: sourceUrl,
       format: format,
       createdAt: _now(),
-      title: sourceUrl.host,
+      title: _optionalText(title),
+      artist: _optionalText(artist),
     );
     await repository.upsert(job);
     _cookieHeaders[job.id] = cookieHeader;
@@ -96,12 +100,22 @@ final class LocalJobCoordinator {
   Future<Job> retry(String jobId) async {
     final job = await _require(jobId);
     if (!job.state.isTerminal) throw StateError('Only finished jobs can retry');
-    return submit(job.sourceUrl, job.format);
+    return submit(
+      job.sourceUrl,
+      job.format,
+      title: job.title,
+      artist: job.artist,
+    );
   }
 
   Future<Job> redownload(String jobId) async {
     final job = await _require(jobId);
-    return submit(job.sourceUrl, job.format);
+    return submit(
+      job.sourceUrl,
+      job.format,
+      title: job.title,
+      artist: job.artist,
+    );
   }
 
   Future<void> dispose() async {
@@ -179,6 +193,13 @@ final class LocalJobCoordinator {
         format: job.format,
         workspacePath: workspace.path,
         cookieFilePath: cookiePath,
+        title: job.title,
+        artist: job.artist,
+        filenameStem: MediaFilename.customStem(
+          job.format,
+          title: job.title,
+          artist: job.artist,
+        ),
       );
       await for (final event in processor.run(request)) {
         final current = await _find(job.id);
@@ -213,6 +234,11 @@ final class LocalJobCoordinator {
       await workspace.cleanup();
       _workspaces.remove(initial.id);
     }
+  }
+
+  static String? _optionalText(String? value) {
+    final trimmed = value?.trim();
+    return trimmed == null || trimmed.isEmpty ? null : trimmed;
   }
 
   String _safeDiagnostic(Object error) {

@@ -8,7 +8,10 @@ import 'processing_event.dart';
 
 final class AndroidLocalProcessor implements LocalProcessor {
   AndroidLocalProcessor({Stream<dynamic>? eventStream})
-    : _events = eventStream ?? const EventChannel('app.downbeat/processor-events').receiveBroadcastStream();
+    : _events =
+          eventStream ??
+          const EventChannel('app.downbeat/processor-events')
+              .receiveBroadcastStream();
 
   static const _methods = MethodChannel('app.downbeat/processor');
   final Stream<dynamic> _events;
@@ -28,10 +31,16 @@ final class AndroidLocalProcessor implements LocalProcessor {
         'format': request.format.name,
         'workspacePath': request.workspacePath,
         'cookieFilePath': request.cookieFilePath,
+        'title': request.title,
+        'artist': request.artist,
+        'filenameStem': request.filenameStem,
       });
       await for (final event in received.stream) {
         yield event;
-        if (event.type == ProcessingEventType.artifact || event.type == ProcessingEventType.failure) break;
+        if (event.type == ProcessingEventType.artifact ||
+            event.type == ProcessingEventType.failure) {
+          break;
+        }
       }
     } finally {
       await subscription.cancel();
@@ -42,7 +51,9 @@ final class AndroidLocalProcessor implements LocalProcessor {
   ProcessingEvent? _decode(Map<dynamic, dynamic> value) {
     switch (value['type']) {
       case 'progress':
-        final stage = JobState.values.where((item) => item.name == value['stage']).firstOrNull;
+        final stage = JobState.values
+            .where((item) => item.name == value['stage'])
+            .firstOrNull;
         if (stage == null || value['bytesReceived'] is! num) return null;
         return ProcessingEvent.progress(
           stage: stage,
@@ -52,14 +63,26 @@ final class AndroidLocalProcessor implements LocalProcessor {
           message: value['message'] as String?,
         );
       case 'stage':
-        final stage = JobState.values.where((item) => item.name == value['stage']).firstOrNull;
-        return stage == null ? null : ProcessingEvent.stage(stage: stage, message: value['message'] as String?);
+        final stage = JobState.values
+            .where((item) => item.name == value['stage'])
+            .firstOrNull;
+        return stage == null
+            ? null
+            : ProcessingEvent.stage(
+                stage: stage,
+                message: value['message'] as String?,
+              );
       case 'artifact':
-        if (value['path'] is! String || value['filename'] is! String || value['size'] is! num) return null;
+        if (value['path'] is! String ||
+            value['filename'] is! String ||
+            value['size'] is! num) {
+          return null;
+        }
         return ProcessingEvent.artifact(
           path: value['path'] as String,
           filename: value['filename'] as String,
-          mediaType: value['mediaType'] as String? ?? 'application/octet-stream',
+          mediaType:
+              value['mediaType'] as String? ?? 'application/octet-stream',
           size: (value['size'] as num).toInt(),
           sha256: value['sha256'] as String?,
         );
@@ -73,5 +96,6 @@ final class AndroidLocalProcessor implements LocalProcessor {
   }
 
   @override
-  Future<void> cancel(String jobId) => _methods.invokeMethod<void>('cancel', {'jobId': jobId});
+  Future<void> cancel(String jobId) =>
+      _methods.invokeMethod<void>('cancel', {'jobId': jobId});
 }

@@ -26,4 +26,15 @@ class AudioConversionTest {
         assertTrue(plan.requiresConversion)
         assertEquals(File("download.source.mp3"), plan.output)
     }
+
+    @Test
+    fun `uses a temporary output when adding metadata to an existing mp3`() {
+        val source = File("download.source.mp3")
+
+        val plan = AudioConversion.plan(source, requiresMetadataRewrite = true)
+
+        assertTrue(plan.requiresConversion)
+        assertEquals(File("download.source.tagged.mp3"), plan.output)
+        assertEquals(source, plan.publishedOutput)
+    }
 }

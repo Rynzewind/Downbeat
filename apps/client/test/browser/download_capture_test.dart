@@ -54,14 +54,24 @@ void main() {
     await tester.tap(find.byKey(const Key('download-fab')));
     await tester.pumpAndSettle();
     expect(find.text('Choose a format'), findsOneWidget);
-    expect(find.text('Video (MP4)'), findsOneWidget);
-    expect(find.text('Audio only (MP3)'), findsOneWidget);
+    expect(find.text('Download Video'), findsOneWidget);
+    expect(find.text('Download Audio'), findsOneWidget);
 
-    await tester.tap(find.text('Audio only (MP3)'));
-    await tester.pump();
+    await tester.tap(find.text('Download Audio'));
+    await tester.pumpAndSettle();
+    expect(find.text('Audio details'), findsOneWidget);
+    await tester.enterText(find.byKey(const Key('metadata-title')), 'My song');
+    await tester.enterText(
+      find.byKey(const Key('metadata-artist')),
+      'My artist',
+    );
+    await tester.tap(find.text('Add to queue'));
+    await tester.pump(const Duration(milliseconds: 500));
 
     expect(repository.current, hasLength(1));
     expect(repository.current.single.format.name, 'mp3');
+    expect(repository.current.single.title, 'My song');
+    expect(repository.current.single.artist, 'My artist');
     expect(find.text('Download queue'), findsOneWidget);
   });
 

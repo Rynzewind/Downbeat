@@ -53,9 +53,7 @@ void main() {
         totalBytes: null,
       ),
     );
-    await _until(
-      () => repository.current.first.bytesReceived == 4096,
-    );
+    await _until(() => repository.current.first.bytesReceived == 4096);
     expect(repository.current.first.percent, isNull);
     expect(processor.requests, hasLength(1));
 
@@ -81,6 +79,20 @@ void main() {
     expect(await Directory(workspace).exists(), isFalse);
   });
 
+  test('carries optional metadata into local processing', () async {
+    await coordinator.submit(
+      Uri.parse('https://example.com/song'),
+      JobFormat.mp3,
+      title: 'My song',
+      artist: 'My artist',
+    );
+    await _until(() => processor.requests.isNotEmpty);
+
+    expect(processor.requests.single.title, 'My song');
+    expect(processor.requests.single.artist, 'My artist');
+    expect(processor.requests.single.filenameStem, 'My artist - My song');
+  });
+
   test('retry and redownload create fresh queued identities', () async {
     final failed = Job(
       id: 'old',
@@ -100,22 +112,25 @@ void main() {
     expect(redownload.format, JobFormat.mp3);
   });
 
-  test('startup marks interrupted conversion failed, never completed', () async {
-    await repository.upsert(
-      Job(
-        id: 'interrupted',
-        sourceUrl: Uri.parse('https://example.com/video'),
-        format: JobFormat.mp4,
-        createdAt: DateTime.utc(2026),
-        state: JobState.converting,
-      ),
-    );
+  test(
+    'startup marks interrupted conversion failed, never completed',
+    () async {
+      await repository.upsert(
+        Job(
+          id: 'interrupted',
+          sourceUrl: Uri.parse('https://example.com/video'),
+          format: JobFormat.mp4,
+          createdAt: DateTime.utc(2026),
+          state: JobState.converting,
+        ),
+      );
 
-    await coordinator.start();
+      await coordinator.start();
 
-    expect(repository.current.single.state, JobState.failed);
-    expect(repository.current.single.message, contains('interrupted'));
-  });
+      expect(repository.current.single.state, JobState.failed);
+      expect(repository.current.single.message, contains('interrupted'));
+    },
+  );
 
   test('rejects non-HTTPS source URLs', () {
     expect(

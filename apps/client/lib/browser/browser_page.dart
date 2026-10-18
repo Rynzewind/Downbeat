@@ -111,20 +111,34 @@ final class _BrowserPageState extends State<BrowserPage>
       backgroundColor: AppColors.surface,
       builder: (context) => const _FormatSheet(),
     );
-    if (format == null) return;
+    if (format == null || !mounted) return;
+    final metadata = await showModalBottomSheet<_DownloadMetadata>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface,
+      builder: (context) => _MetadataSheet(format: format),
+    );
+    if (metadata == null || !mounted) return;
     final coordinator = widget.coordinator;
     if (coordinator != null) {
       final cookies = await const BrowserCookieExporter().cookieHeaderFor(
         _current,
       );
-      await coordinator.submit(_current, format, cookieHeader: cookies);
+      await coordinator.submit(
+        _current,
+        format,
+        cookieHeader: cookies,
+        title: metadata.title,
+        artist: metadata.artist,
+      );
     } else {
       await widget.repository.upsert(
         Job(
           id: DateTime.now().microsecondsSinceEpoch.toString(),
           sourceUrl: _current,
           format: format,
-          title: _current.host,
+          title: metadata.title ?? _current.host,
+          artist: metadata.artist,
           createdAt: DateTime.now().toUtc(),
         ),
       );
@@ -406,17 +420,125 @@ final class _FormatSheet extends StatelessWidget {
           const SizedBox(height: 18),
           FilledButton.icon(
             onPressed: () => Navigator.pop(context, JobFormat.mp4),
-            icon: const Icon(Icons.movie_creation_outlined),
-            label: const Text('Video (MP4)'),
+            icon: const Icon(Icons.tv_rounded),
+            label: const Text('Download Video'),
           ),
           const SizedBox(height: 10),
           OutlinedButton.icon(
             onPressed: () => Navigator.pop(context, JobFormat.mp3),
-            icon: const Icon(Icons.graphic_eq),
-            label: const Text('Audio only (MP3)'),
+            icon: const Icon(Icons.music_note_rounded),
+            label: const Text('Download Audio'),
           ),
         ],
       ),
     ),
   );
+}
+
+final class _DownloadMetadata {
+  const _DownloadMetadata({this.title, this.artist});
+
+  final String? title;
+  final String? artist;
+}
+
+final class _MetadataSheet extends StatefulWidget {
+  const _MetadataSheet({required this.format});
+
+  final JobFormat format;
+
+  @override
+  State<_MetadataSheet> createState() => _MetadataSheetState();
+}
+
+final class _MetadataSheetState extends State<_MetadataSheet> {
+  final _title = TextEditingController();
+  final _artist = TextEditingController();
+
+  @override
+  void dispose() {
+    _title.dispose();
+    _artist.dispose();
+    super.dispose();
+  }
+
+  String? _optional(String value) {
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? null : trimmed;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final audio = widget.format == JobFormat.mp3;
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          22,
+          18,
+          22,
+          24 + MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  audio ? Icons.music_note_rounded : Icons.tv_rounded,
+                  color: AppColors.cyan,
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  audio ? 'Audio details' : 'Video details',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              audio
+                  ? 'Optional — blank fields use the source title and creator.'
+                  : 'Optional — leave blank to use the source title.',
+              style: const TextStyle(color: Colors.white60),
+            ),
+            const SizedBox(height: 18),
+            TextField(
+              key: const Key('metadata-title'),
+              controller: _title,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: const InputDecoration(
+                labelText: 'Title',
+                hintText: 'Use source title',
+              ),
+            ),
+            if (audio) ...[
+              const SizedBox(height: 12),
+              TextField(
+                key: const Key('metadata-artist'),
+                controller: _artist,
+                textCapitalization: TextCapitalization.words,
+                decoration: const InputDecoration(
+                  labelText: 'Artist',
+                  hintText: 'Use source creator',
+                ),
+              ),
+            ],
+            const SizedBox(height: 20),
+            FilledButton.icon(
+              onPressed: () => Navigator.pop(
+                context,
+                _DownloadMetadata(
+                  title: _optional(_title.text),
+                  artist: audio ? _optional(_artist.text) : null,
+                ),
+              ),
+              icon: const Icon(Icons.add_to_queue_rounded),
+              label: const Text('Add to queue'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

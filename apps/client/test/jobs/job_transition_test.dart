@@ -8,6 +8,7 @@ void main() {
     sourceUrl: Uri.parse('https://example.com/watch/1'),
     format: JobFormat.mp4,
     title: 'Example episode',
+    artist: 'Example artist',
     createdAt: DateTime.utc(2026, 10, 17),
   );
 
@@ -53,6 +54,8 @@ void main() {
     expect(fresh.id, 'local-2');
     expect(fresh.sourceUrl, completed.sourceUrl);
     expect(fresh.format, completed.format);
+    expect(fresh.title, completed.title);
+    expect(fresh.artist, completed.artist);
     expect(fresh.state, JobState.queued);
     expect(fresh.percent, isNull);
     expect(fresh.filename, isNull);

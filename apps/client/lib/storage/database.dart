@@ -28,6 +28,7 @@ final class SqliteJobRepository implements JobRepository {
         format TEXT NOT NULL,
         created_at TEXT NOT NULL,
         title TEXT,
+        artist TEXT,
         filename TEXT,
         state TEXT NOT NULL,
         percent REAL,
@@ -40,24 +41,34 @@ final class SqliteJobRepository implements JobRepository {
         sort_order INTEGER NOT NULL
       );
     ''');
-    final columns = database.select('PRAGMA table_info(jobs)').map((row) => row['name'] as String).toSet();
+    final columns = database
+        .select('PRAGMA table_info(jobs)')
+        .map((row) => row['name'] as String)
+        .toSet();
     if (!columns.contains('remote_sequence')) {
-      database.execute('ALTER TABLE jobs ADD COLUMN remote_sequence INTEGER NOT NULL DEFAULT 0');
-    }
-    if (!columns.contains('local_sequence')) {
-      database.execute('ALTER TABLE jobs ADD COLUMN local_sequence INTEGER NOT NULL DEFAULT 0');
       database.execute(
-        'UPDATE jobs SET local_sequence = remote_sequence',
+        'ALTER TABLE jobs ADD COLUMN remote_sequence INTEGER NOT NULL DEFAULT 0',
       );
     }
+    if (!columns.contains('local_sequence')) {
+      database.execute(
+        'ALTER TABLE jobs ADD COLUMN local_sequence INTEGER NOT NULL DEFAULT 0',
+      );
+      database.execute('UPDATE jobs SET local_sequence = remote_sequence');
+    }
     if (!columns.contains('bytes_received')) {
-      database.execute('ALTER TABLE jobs ADD COLUMN bytes_received INTEGER NOT NULL DEFAULT 0');
+      database.execute(
+        'ALTER TABLE jobs ADD COLUMN bytes_received INTEGER NOT NULL DEFAULT 0',
+      );
     }
     if (!columns.contains('total_bytes')) {
       database.execute('ALTER TABLE jobs ADD COLUMN total_bytes INTEGER');
     }
     if (!columns.contains('output_path')) {
       database.execute('ALTER TABLE jobs ADD COLUMN output_path TEXT');
+    }
+    if (!columns.contains('artist')) {
+      database.execute('ALTER TABLE jobs ADD COLUMN artist TEXT');
     }
     final existing = database.select(
       "SELECT value FROM app_metadata WHERE key = 'device_id'",
@@ -88,11 +99,13 @@ final class SqliteJobRepository implements JobRepository {
           format: JobFormat.values.byName(row['format'] as String),
           createdAt: DateTime.parse(row['created_at'] as String),
           title: row['title'] as String?,
+          artist: row['artist'] as String?,
           filename: row['filename'] as String?,
           state: JobState.values.byName(row['state'] as String),
           percent: (row['percent'] as num?)?.toDouble(),
           message: row['message'] as String?,
-          localSequence: (row['local_sequence'] as int?) ??
+          localSequence:
+              (row['local_sequence'] as int?) ??
               (row['remote_sequence'] as int? ?? 0),
           bytesReceived: row['bytes_received'] as int? ?? 0,
           totalBytes: row['total_bytes'] as int?,
@@ -125,15 +138,16 @@ final class SqliteJobRepository implements JobRepository {
     _database.execute(
       '''
       INSERT INTO jobs(
-        id, source_url, format, created_at, title, filename,
+        id, source_url, format, created_at, title, artist, filename,
         state, percent, message, remote_sequence, local_sequence,
         bytes_received, total_bytes, output_path, sort_order
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         source_url = excluded.source_url,
         format = excluded.format,
         created_at = excluded.created_at,
         title = excluded.title,
+        artist = excluded.artist,
         filename = excluded.filename,
         state = excluded.state,
         percent = excluded.percent,
@@ -150,6 +164,7 @@ final class SqliteJobRepository implements JobRepository {
         job.format.name,
         job.createdAt.toIso8601String(),
         job.title,
+        job.artist,
         job.filename,
         job.state.name,
         job.percent,

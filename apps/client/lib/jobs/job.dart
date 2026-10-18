@@ -25,6 +25,7 @@ final class Job {
     required this.format,
     required this.createdAt,
     this.title,
+    this.artist,
     this.filename,
     this.state = JobState.queued,
     this.percent,
@@ -41,6 +42,7 @@ final class Job {
   final JobFormat format;
   final DateTime createdAt;
   final String? title;
+  final String? artist;
   final String? filename;
   final JobState state;
   final double? percent;
@@ -59,6 +61,7 @@ final class Job {
     JobFormat? format,
     DateTime? createdAt,
     Object? title = _unset,
+    Object? artist = _unset,
     Object? filename = _unset,
     JobState? state,
     Object? percent = _unset,
@@ -74,6 +77,7 @@ final class Job {
     format: format ?? this.format,
     createdAt: createdAt ?? this.createdAt,
     title: identical(title, _unset) ? this.title : title as String?,
+    artist: identical(artist, _unset) ? this.artist : artist as String?,
     filename: identical(filename, _unset) ? this.filename : filename as String?,
     state: state ?? this.state,
     percent: identical(percent, _unset)
@@ -96,6 +100,7 @@ final class Job {
     format: format,
     createdAt: createdAt,
     title: title,
+    artist: artist,
     localSequence: 0,
   );
 }

@@ -69,6 +69,7 @@ void main() {
         sourceUrl: Uri.parse('https://example.com/one'),
         format: JobFormat.mp4,
         title: 'First',
+        artist: 'Creator',
         createdAt: DateTime.utc(2026),
       ),
     );
@@ -95,6 +96,7 @@ void main() {
       'one',
     ]);
     expect((await reopened.watchAll().first).first.filename, 'two.mp3');
+    expect((await reopened.watchAll().first).last.artist, 'Creator');
   });
 
   test('migrates the legacy remote sequence into local progress', () async {

@@ -58,7 +58,9 @@ final class WindowsLocalProcessor implements LocalProcessor {
       lines.add(line);
     }).asFuture<void>();
     final exit = tool.exitCode;
-    unawaited(Future.wait([stdoutDone, stderrDone, exit]).whenComplete(lines.close));
+    unawaited(
+      Future.wait([stdoutDone, stderrDone, exit]).whenComplete(lines.close),
+    );
     try {
       await for (final line in lines.stream) {
         final event = parser.parse(line);
@@ -81,7 +83,9 @@ final class WindowsLocalProcessor implements LocalProcessor {
       if (code != 0 && _active.containsKey(request.jobId)) {
         yield parser.failure(
           errors.join('\n'),
-          secrets: [if (request.cookieFilePath != null) request.cookieFilePath!],
+          secrets: [
+            if (request.cookieFilePath != null) request.cookieFilePath!,
+          ],
         );
       }
     } finally {
@@ -93,17 +97,46 @@ final class WindowsLocalProcessor implements LocalProcessor {
     '--newline',
     '--no-playlist',
     '--no-part',
-    '--ffmpeg-location', runtimeDirectory,
+    '--ffmpeg-location',
+    runtimeDirectory,
     '--progress-template',
     'download:DOWNBEAT_PROGRESS:%(progress.downloaded_bytes)s:%(progress.total_bytes_estimate)s',
-    '--print', 'after_move:DOWNBEAT_ARTIFACT:%(filepath)s',
-    '--output', '${request.workspacePath}${Platform.pathSeparator}%(title).180B [%(id)s].%(ext)s',
-    if (request.cookieFilePath != null) ...['--cookies', request.cookieFilePath!],
-    if (request.format == JobFormat.mp3) ...['--extract-audio', '--audio-format', 'mp3'] else ...[
-      '--format', 'bestvideo*+bestaudio/best', '--merge-output-format', 'mp4',
+    '--print',
+    'after_move:DOWNBEAT_ARTIFACT:%(filepath)s',
+    '--output',
+    request.filenameStem == null
+        ? '${request.workspacePath}${Platform.pathSeparator}%(title).180B [%(id)s].%(ext)s'
+        : '${request.workspacePath}${Platform.pathSeparator}${request.filenameStem}.%(ext)s',
+    '--embed-metadata',
+    if (request.title != null) ...[
+      '--parse-metadata',
+      '${_metadataLiteral(request.title!)}:%(meta_title)s',
+    ],
+    if (request.artist != null) ...[
+      '--parse-metadata',
+      '${_metadataLiteral(request.artist!)}:%(meta_artist)s',
+    ],
+    if (request.cookieFilePath != null) ...[
+      '--cookies',
+      request.cookieFilePath!,
+    ],
+    if (request.format == JobFormat.mp3) ...[
+      '--extract-audio',
+      '--audio-format',
+      'mp3',
+    ] else ...[
+      '--format',
+      'bestvideo*+bestaudio/best',
+      '--merge-output-format',
+      'mp4',
     ],
     request.sourceUrl.toString(),
   ];
+
+  static String _metadataLiteral(String value) => value
+      .replaceAll(r'\', r'\\')
+      .replaceAll(':', r'\:')
+      .replaceAll('%', '%%');
 
   @override
   Future<void> cancel(String jobId) async {
@@ -115,19 +148,27 @@ final class WindowsLocalProcessor implements LocalProcessor {
     List<String> arguments, {
     String? workingDirectory,
     Map<String, String>? environment,
-  }) async => _ProcessTool(await Process.start(
-    executable,
-    arguments,
-    workingDirectory: workingDirectory,
-    environment: environment,
-  ));
+  }) async => _ProcessTool(
+    await Process.start(
+      executable,
+      arguments,
+      workingDirectory: workingDirectory,
+      environment: environment,
+    ),
+  );
 }
 
 final class _ProcessTool implements RunningTool {
   _ProcessTool(this.process);
   final Process process;
-  @override Stream<String> get stdout => process.stdout.transform(utf8.decoder).transform(const LineSplitter());
-  @override Stream<String> get stderr => process.stderr.transform(utf8.decoder).transform(const LineSplitter());
-  @override Future<int> get exitCode => process.exitCode;
-  @override bool kill() => process.kill(ProcessSignal.sigterm);
+  @override
+  Stream<String> get stdout =>
+      process.stdout.transform(utf8.decoder).transform(const LineSplitter());
+  @override
+  Stream<String> get stderr =>
+      process.stderr.transform(utf8.decoder).transform(const LineSplitter());
+  @override
+  Future<int> get exitCode => process.exitCode;
+  @override
+  bool kill() => process.kill(ProcessSignal.sigterm);
 }

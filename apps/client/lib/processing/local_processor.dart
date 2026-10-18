@@ -8,6 +8,9 @@ final class LocalProcessRequest {
     required this.format,
     required this.workspacePath,
     this.cookieFilePath,
+    this.title,
+    this.artist,
+    this.filenameStem,
   });
 
   final String jobId;
@@ -15,6 +18,9 @@ final class LocalProcessRequest {
   final JobFormat format;
   final String workspacePath;
   final String? cookieFilePath;
+  final String? title;
+  final String? artist;
+  final String? filenameStem;
 }
 
 abstract interface class LocalProcessor {

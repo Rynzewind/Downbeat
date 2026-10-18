@@ -56,6 +56,9 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
         val jobId = call.argument<String>("jobId") ?: return result.error("request", "Missing job id", null)
         val url = call.argument<String>("url") ?: return result.error("request", "Missing URL", null)
         val format = call.argument<String>("format") ?: "mp4"
+        val title = call.argument<String>("title")?.trim()?.takeIf { it.isNotEmpty() }
+        val artist = call.argument<String>("artist")?.trim()?.takeIf { it.isNotEmpty() }
+        val filenameStem = call.argument<String>("filenameStem")?.trim()?.takeIf { it.isNotEmpty() }
         val workspace = File(call.argument<String>("workspacePath")!!).apply { mkdirs() }
         val cookies = call.argument<String>("cookieFilePath")
         val output = File(workspace, if (format == "mp3") "%(title).180B [%(id)s].source.%(ext)s" else "%(title).180B [%(id)s].video.%(ext)s")
@@ -100,9 +103,13 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
                 var artifact = workspace.walkTopDown().filter { it.isFile && it.name != "cookies.txt" }.maxByOrNull { it.lastModified() }
                     ?: throw IllegalStateException("No downloaded file was produced")
                 if (format == "mp3") {
-                    val conversion = AudioConversion.plan(artifact)
+                    val conversion = AudioConversion.plan(
+                        artifact,
+                        requiresMetadataRewrite = title != null || artist != null,
+                    )
                     if (conversion.requiresConversion) {
-                        val command = "-y -i ${quote(artifact.absolutePath)} -vn -codec:a libmp3lame ${quote(conversion.output.absolutePath)}"
+                        val command = "-y -i ${quote(artifact.absolutePath)} -vn -map_metadata 0 " +
+                            "-codec:a libmp3lame${metadataOptions(title, artist)} ${quote(conversion.output.absolutePath)}"
                         val session = executeFfmpegWithProgress(
                             command = command,
                             jobId = jobId,
@@ -115,8 +122,13 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
                             throw IllegalStateException("Audio conversion failed (${session.returnCode}): ${session.allLogsAsString.takeLast(1200)}")
                         }
                         artifact.delete()
+                        if (conversion.output != conversion.publishedOutput &&
+                            !conversion.output.renameTo(conversion.publishedOutput)
+                        ) {
+                            throw IllegalStateException("Could not finalise tagged audio")
+                        }
                     }
-                    artifact = conversion.output
+                    artifact = conversion.publishedOutput
                 } else {
                     val video = artifact
                     val audioRequest = YtDlpRequest(url)
@@ -149,11 +161,12 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
                         ?: throw IllegalStateException("No audio stream was produced")
                     val baseName = video.name.replace(Regex("\\.video\\.[^.]+$"), "")
                     val merged = File(workspace, "$baseName.mp4")
-                    mergeMp4(jobId, video, audio, merged)
+                    mergeMp4(jobId, video, audio, merged, title)
                     video.delete()
                     audio.delete()
                     artifact = merged
                 }
+                artifact = applyCustomFilename(artifact, filenameStem)
                 emit(mapOf("jobId" to jobId, "type" to "artifact", "path" to artifact.absolutePath, "filename" to artifact.name, "mediaType" to if (format == "mp3") "audio/mpeg" else "video/mp4", "size" to artifact.length()))
                 notify("Download completed", 100)
             } catch (error: Throwable) {
@@ -176,6 +189,28 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
         main.post { manager.notify(DownloadNotification.NOTIFICATION_ID, DownloadNotification.build(context, text, progress)) }
     }
     private fun quote(value: String) = "\"${value.replace("\"", "\\\"")}\""
+
+    private fun metadataOptions(title: String?, artist: String?): String = buildString {
+        if (title != null) append(" -metadata title=${quote(title)}")
+        if (artist != null) append(" -metadata artist=${quote(artist)}")
+    }
+
+    private fun applyCustomFilename(artifact: File, requestedStem: String?): File {
+        if (requestedStem == null) return artifact
+        val safeStem = requestedStem
+            .replace(Regex("[<>:\"/\\\\|?*\\x00-\\x1F]"), " ")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+            .trimEnd('.', ' ')
+            .take(150)
+            .trimEnd()
+        if (safeStem.isEmpty()) return artifact
+        val renamed = File(artifact.parentFile, "$safeStem.${artifact.extension}")
+        if (renamed == artifact) return artifact
+        if (renamed.exists()) renamed.delete()
+        if (!artifact.renameTo(renamed)) throw IllegalStateException("Could not apply the requested filename")
+        return renamed
+    }
 
     private fun configureSiteOptions(request: YtDlpRequest, url: String) {
         val quickJs = File(context.applicationInfo.nativeLibraryDir, "libqjs.so")
@@ -341,17 +376,19 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
         }
     }
 
-    private fun mergeMp4(jobId: String, video: File, audio: File, output: File) {
+    private fun mergeMp4(jobId: String, video: File, audio: File, output: File, title: String?) {
         output.delete()
         val highestProgress = AtomicInteger(94)
         val copyCommand = "-y -i ${quote(video.absolutePath)} -i ${quote(audio.absolutePath)} " +
-            "-map 0:v:0 -map 1:a:0 -c:v copy -c:a aac -b:a 192k -movflags +faststart ${quote(output.absolutePath)}"
+            "-map 0:v:0 -map 1:a:0 -map_metadata 0 -c:v copy -c:a aac -b:a 192k " +
+            "-movflags +faststart${metadataOptions(title, null)} ${quote(output.absolutePath)}"
         val copySession = executeFfmpegWithProgress(copyCommand, jobId, video, 95, 99, "Finalising video", highestProgress)
         if (ReturnCode.isSuccess(copySession.returnCode) && output.exists() && output.length() > 0L) return
 
         output.delete()
         val compatibleCommand = "-y -i ${quote(video.absolutePath)} -i ${quote(audio.absolutePath)} " +
-            "-map 0:v:0 -map 1:a:0 -c:v mpeg4 -q:v 4 -c:a aac -b:a 192k -movflags +faststart ${quote(output.absolutePath)}"
+            "-map 0:v:0 -map 1:a:0 -map_metadata 0 -c:v mpeg4 -q:v 4 -c:a aac -b:a 192k " +
+            "-movflags +faststart${metadataOptions(title, null)} ${quote(output.absolutePath)}"
         val compatibleSession = executeFfmpegWithProgress(compatibleCommand, jobId, video, 95, 99, "Converting video", highestProgress)
         if (ReturnCode.isSuccess(compatibleSession.returnCode) && output.exists() && output.length() > 0L) return
         throw IllegalStateException(
