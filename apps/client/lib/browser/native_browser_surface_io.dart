@@ -91,7 +91,17 @@ final class _NativeBrowserSurfaceState extends State<NativeBrowserSurface> {
           'Native browser is unavailable on this platform',
         );
       }
-      if (mounted) setState(() {});
+      if (mounted) {
+        setState(() {});
+        if (Platform.isAndroid) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            unawaited(
+              const MethodChannel('app.downbeat/browser')
+                  .invokeMethod<void>('enableAutofill'),
+            );
+          });
+        }
+      }
     } on PlatformException catch (error) {
       if (mounted) setState(() => _error = error);
     } on UnsupportedError catch (error) {

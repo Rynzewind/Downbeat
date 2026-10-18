@@ -7,7 +7,10 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import android.view.View
+import android.view.ViewGroup
 import android.webkit.CookieManager
+import android.webkit.WebView
 import java.io.File
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -36,7 +39,14 @@ class MainActivity : FlutterActivity() {
             override fun onCancel(arguments: Any?) { shareSink = null }
         })
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "app.downbeat/browser").setMethodCallHandler { call, result ->
-            if (call.method == "getCookies") result.success(CookieManager.getInstance().getCookie(call.arguments as String)) else result.notImplemented()
+            when (call.method) {
+                "getCookies" -> result.success(CookieManager.getInstance().getCookie(call.arguments as String))
+                "enableAutofill" -> {
+                    enableBrowserAutofill(window.decorView)
+                    result.success(null)
+                }
+                else -> result.notImplemented()
+            }
         }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "app.downbeat/delivery").setMethodCallHandler { call, result ->
             when (call.method) {
@@ -97,4 +107,15 @@ class MainActivity : FlutterActivity() {
         } else {
             null
         }
+
+    private fun enableBrowserAutofill(view: View) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        if (view is WebView) {
+            view.importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_YES
+            return
+        }
+        if (view is ViewGroup) {
+            for (index in 0 until view.childCount) enableBrowserAutofill(view.getChildAt(index))
+        }
+    }
 }
