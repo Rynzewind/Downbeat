@@ -4,6 +4,7 @@ import 'package:downbeat/jobs/job.dart';
 import 'package:downbeat/jobs/job_repository.dart';
 import 'package:downbeat/storage/database.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sqlite3/sqlite3.dart';
 
 void main() {
   test(
@@ -94,5 +95,50 @@ void main() {
       'one',
     ]);
     expect((await reopened.watchAll().first).first.filename, 'two.mp3');
+  });
+
+  test('migrates the legacy remote sequence into local progress', () async {
+    final directory = await Directory.systemTemp.createTemp('downbeat-db-');
+    addTearDown(() => directory.delete(recursive: true));
+    final path = '${directory.path}${Platform.pathSeparator}legacy.sqlite';
+    final legacy = sqlite3.open(path);
+    legacy.execute('''
+      CREATE TABLE app_metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+      CREATE TABLE jobs (
+        id TEXT PRIMARY KEY,
+        source_url TEXT NOT NULL,
+        format TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        title TEXT,
+        filename TEXT,
+        state TEXT NOT NULL,
+        percent REAL,
+        message TEXT,
+        remote_sequence INTEGER NOT NULL DEFAULT 0,
+        sort_order INTEGER NOT NULL
+      );
+    ''');
+    legacy.execute(
+      'INSERT INTO jobs VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [
+        'legacy',
+        'https://example.com/video',
+        'mp4',
+        DateTime.utc(2026).toIso8601String(),
+        null,
+        null,
+        'failed',
+        null,
+        null,
+        7,
+        0,
+      ],
+    );
+    legacy.close();
+
+    final migrated = await SqliteJobRepository.open(path);
+    addTearDown(migrated.close);
+
+    expect((await migrated.watchAll().first).single.localSequence, 7);
   });
 }
