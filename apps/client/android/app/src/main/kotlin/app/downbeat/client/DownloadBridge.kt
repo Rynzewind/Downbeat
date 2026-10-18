@@ -77,7 +77,7 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
                 message.contains("ERROR:", ignoreCase = true) ||
                 message.contains("WARNING:", ignoreCase = true)
             ) {
-                diagnostic.updateAndGet { "$it\n$message".takeLast(3000) }
+                diagnostic.updateAndGet { "$it\n$message".takeLast(8000) }
             }
         }) { progress, _, line ->
             val overall = if (format == "mp4") (progress * 0.75).toInt() else progress.toInt()
@@ -114,7 +114,7 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
                             message.contains("ERROR:", ignoreCase = true) ||
                             message.contains("WARNING:", ignoreCase = true)
                         ) {
-                            diagnostic.updateAndGet { "$it\n$message".takeLast(3000) }
+                            diagnostic.updateAndGet { "$it\n$message".takeLast(8000) }
                         }
                     }) { progress, _, line ->
                         val overall = 75 + (progress * 0.2).toInt()
@@ -221,14 +221,14 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
             "sign in" in value || "not a bot" in value || "cookies" in value ->
                 "authentication" to "This site needs a signed-in browser session. Sign in inside Downbeat, then try again."
             "private video" in value -> "authentication" to "This video is private or your Downbeat browser is not signed in to the account that can view it."
+            "javascript" in value || "js runtime" in value || "signature" in value ->
+                "extractor" to "YouTube's player challenge could not be solved. Copy the debug details so Downbeat can identify the failed component."
             "requested format" in value ->
                 "format" to "That video does not offer a compatible stream. Try the other format."
             "video unavailable" in value || "not available" in value ->
                 "unavailable" to "This video is unavailable to this device or account."
             "geo" in value || "country" in value ->
                 "unavailable" to "This video is not available in your current region."
-            "javascript" in value || "js runtime" in value || "signature" in value ->
-                "extractor" to "YouTube changed its player. This Downbeat build needs an extractor update."
             "unsatisfiedlink" in value || "native" in value && "load" in value ->
                 "conversion" to "This phone could not start the audio converter."
             else -> "download" to "Downbeat could not download this page. The site rejected the media request."
@@ -240,7 +240,7 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
         .replace(Regex("https?://\\S+", RegexOption.IGNORE_CASE), "[url]")
         .replace(Regex("(?i)(cookie|authorization|token)[=:]\\s*\\S+"), "\$1=[hidden]")
         .replace(Regex("\\s+"), " ")
-        .take(1200)
+        .take(3000)
 
     private fun mergeMp4(video: File, audio: File, output: File) {
         output.delete()
@@ -335,15 +335,18 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
     }
 
     private fun installCurrentYtDlp(appContext: Context) {
-        val assetName = "python/yt_dlp-2026.10.10.233141.dev0-py3-none-any.whl"
-        val wheel = File(appContext.filesDir, assetName.substringAfterLast('/'))
-        if (!wheel.exists() || wheel.length() == 0L) {
-            appContext.assets.open(assetName).use { input ->
-                wheel.outputStream().use { output -> input.copyTo(output) }
+        val wheels = PythonRuntimePackages.assets.map { assetName ->
+            val wheel = File(appContext.filesDir, assetName.substringAfterLast('/'))
+            if (!wheel.exists() || wheel.length() == 0L) {
+                appContext.assets.open(assetName).use { input ->
+                    wheel.outputStream().use { output -> input.copyTo(output) }
+                }
             }
+            wheel
         }
         val python = Python.getInstance()
-        python.getModule("sys").get("path")?.callAttr("insert", 0, wheel.absolutePath)
+        val path = python.getModule("sys").get("path")
+        wheels.asReversed().forEach { wheel -> path?.callAttr("insert", 0, wheel.absolutePath) }
         python.getModule("importlib").callAttr("invalidate_caches")
     }
 
