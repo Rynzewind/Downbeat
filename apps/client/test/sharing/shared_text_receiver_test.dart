@@ -1,10 +1,10 @@
-import 'package:episode_downloader/sharing/shared_text_receiver.dart';
+import 'package:downbeat/sharing/shared_text_receiver.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  const channel = MethodChannel('episode_downloader/share');
+  const channel = MethodChannel('app.downbeat/share');
 
   tearDown(() async {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger

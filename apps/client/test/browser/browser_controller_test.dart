@@ -1,4 +1,4 @@
-import 'package:episode_downloader/browser/browser_controller.dart';
+import 'package:downbeat/browser/browser_controller.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

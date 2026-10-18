@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:crypto/crypto.dart';
-import 'package:episode_downloader/delivery/file_delivery.dart';
+import 'package:downbeat/delivery/file_delivery.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

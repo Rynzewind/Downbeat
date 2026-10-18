@@ -1,6 +1,6 @@
-import 'package:episode_downloader/jobs/job.dart';
-import 'package:episode_downloader/jobs/job_repository.dart';
-import 'package:episode_downloader/sync/job_synchronizer.dart';
+import 'package:downbeat/jobs/job.dart';
+import 'package:downbeat/jobs/job_repository.dart';
+import 'package:downbeat/sync/job_synchronizer.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 final class FakeRemoteEvents implements RemoteEventSource {

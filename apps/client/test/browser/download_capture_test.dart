@@ -1,5 +1,5 @@
-import 'package:episode_downloader/app.dart';
-import 'package:episode_downloader/jobs/job_repository.dart';
+import 'package:downbeat/app.dart';
+import 'package:downbeat/jobs/job_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -9,7 +9,7 @@ void main() {
   ) async {
     final repository = MemoryJobRepository();
     await tester.pumpWidget(
-      EpisodeDownloaderApp(repository: repository, simulateProgress: false),
+      DownbeatApp(repository: repository, simulateProgress: false),
     );
 
     await tester.tap(find.byKey(const Key('download-fab')));
@@ -31,7 +31,7 @@ void main() {
     final repository = MemoryJobRepository();
 
     await tester.pumpWidget(
-      EpisodeDownloaderApp(
+      DownbeatApp(
         repository: repository,
         simulateProgress: false,
         initialSharedUrl: Uri.parse('https://www.tiktok.com/t/ZExample/'),

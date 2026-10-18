@@ -1,4 +1,4 @@
-package app.episode.downloader.episode_downloader
+package app.downbeat.client
 
 import android.content.Intent
 import io.flutter.embedding.android.FlutterActivity
@@ -13,7 +13,7 @@ class MainActivity : FlutterActivity() {
         sharedText = extractSharedText(intent)
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
-            "episode_downloader/share"
+            "app.downbeat/share"
         ).setMethodCallHandler { call, result ->
             if (call.method == "getInitialSharedText") {
                 result.success(sharedText.also { sharedText = null })

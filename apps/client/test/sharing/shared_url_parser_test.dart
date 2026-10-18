@@ -1,4 +1,4 @@
-import 'package:episode_downloader/sharing/shared_url_parser.dart';
+import 'package:downbeat/sharing/shared_url_parser.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -22,6 +22,16 @@ void main() {
     test('ignores insecure and malformed links', () {
       expect(extractSharedHttpsUrl('http://example.com/video'), isNull);
       expect(extractSharedHttpsUrl('not a link'), isNull);
+    });
+
+    test('uses the first HTTPS URL and ignores surrounding instructions', () {
+      expect(
+        extractSharedHttpsUrl(
+          'Run this text, then https://first.example/video and '
+          'https://second.example/other',
+        ),
+        Uri.parse('https://first.example/video'),
+      );
     });
   });
 }

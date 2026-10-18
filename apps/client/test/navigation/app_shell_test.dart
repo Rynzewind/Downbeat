@@ -1,12 +1,12 @@
-import 'package:episode_downloader/app.dart';
-import 'package:episode_downloader/jobs/job_repository.dart';
+import 'package:downbeat/app.dart';
+import 'package:downbeat/jobs/job_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   testWidgets('uses Downbeat as the product name', (tester) async {
     await tester.pumpWidget(
-      EpisodeDownloaderApp(repository: MemoryJobRepository()),
+      DownbeatApp(repository: MemoryJobRepository()),
     );
 
     final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
@@ -17,7 +17,7 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      EpisodeDownloaderApp(repository: MemoryJobRepository()),
+      DownbeatApp(repository: MemoryJobRepository()),
     );
 
     expect(find.text('Browse'), findsOneWidget);

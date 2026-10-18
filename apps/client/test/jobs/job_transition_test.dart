@@ -1,5 +1,5 @@
-import 'package:episode_downloader/jobs/job.dart';
-import 'package:episode_downloader/jobs/job_transition.dart';
+import 'package:downbeat/jobs/job.dart';
+import 'package:downbeat/jobs/job_transition.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

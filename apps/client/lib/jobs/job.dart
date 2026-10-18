@@ -29,8 +29,12 @@ final class Job {
     this.state = JobState.queued,
     this.percent,
     this.message,
-    this.remoteSequence = 0,
-  });
+    int? localSequence,
+    @Deprecated('Use localSequence') int? remoteSequence,
+    this.bytesReceived = 0,
+    this.totalBytes,
+    this.outputPath,
+  }) : localSequence = localSequence ?? remoteSequence ?? 0;
 
   final String id;
   final Uri sourceUrl;
@@ -41,7 +45,13 @@ final class Job {
   final JobState state;
   final double? percent;
   final String? message;
-  final int remoteSequence;
+  final int localSequence;
+  final int bytesReceived;
+  final int? totalBytes;
+  final String? outputPath;
+
+  @Deprecated('Use localSequence')
+  int get remoteSequence => localSequence;
 
   Job copyWith({
     String? id,
@@ -53,7 +63,11 @@ final class Job {
     JobState? state,
     Object? percent = _unset,
     Object? message = _unset,
-    int? remoteSequence,
+    int? localSequence,
+    @Deprecated('Use localSequence') int? remoteSequence,
+    int? bytesReceived,
+    Object? totalBytes = _unset,
+    Object? outputPath = _unset,
   }) => Job(
     id: id ?? this.id,
     sourceUrl: sourceUrl ?? this.sourceUrl,
@@ -66,7 +80,14 @@ final class Job {
         ? this.percent
         : (percent as num?)?.toDouble(),
     message: identical(message, _unset) ? this.message : message as String?,
-    remoteSequence: remoteSequence ?? this.remoteSequence,
+    localSequence: localSequence ?? remoteSequence ?? this.localSequence,
+    bytesReceived: bytesReceived ?? this.bytesReceived,
+    totalBytes: identical(totalBytes, _unset)
+        ? this.totalBytes
+        : totalBytes as int?,
+    outputPath: identical(outputPath, _unset)
+        ? this.outputPath
+        : outputPath as String?,
   );
 
   Job redownload({required String id, required DateTime createdAt}) => Job(
@@ -75,6 +96,6 @@ final class Job {
     format: format,
     createdAt: createdAt,
     title: title,
-    remoteSequence: 0,
+    localSequence: 0,
   );
 }

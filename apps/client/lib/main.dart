@@ -10,7 +10,7 @@ Future<void> main() async {
   final sharedUrl = await const SharedTextReceiver().initialUrl();
   final repository = await openJobRepository();
   runApp(
-    EpisodeDownloaderApp(
+    DownbeatApp(
       repository: repository,
       initialSharedUrl: sharedUrl,
       enableNativeBrowser: !kIsWeb,

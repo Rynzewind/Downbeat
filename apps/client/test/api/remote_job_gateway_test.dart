@@ -1,9 +1,9 @@
 import 'dart:convert';
 
-import 'package:episode_downloader/api/api_client.dart';
-import 'package:episode_downloader/api/device_identity.dart';
-import 'package:episode_downloader/api/remote_job_gateway.dart';
-import 'package:episode_downloader/jobs/job.dart';
+import 'package:downbeat/api/api_client.dart';
+import 'package:downbeat/api/device_identity.dart';
+import 'package:downbeat/api/remote_job_gateway.dart';
+import 'package:downbeat/jobs/job.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 final class MemorySecureStore implements SecureValueStore {

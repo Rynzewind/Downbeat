@@ -1,4 +1,4 @@
-import 'package:episode_downloader/jobs/filename.dart';
+import 'package:downbeat/jobs/filename.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

@@ -1,4 +1,4 @@
-import 'package:episode_downloader/browser/cookie_scope.dart';
+import 'package:downbeat/browser/cookie_scope.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

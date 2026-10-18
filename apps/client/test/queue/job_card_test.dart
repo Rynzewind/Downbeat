@@ -1,5 +1,5 @@
-import 'package:episode_downloader/jobs/job.dart';
-import 'package:episode_downloader/queue/job_card.dart';
+import 'package:downbeat/jobs/job.dart';
+import 'package:downbeat/queue/job_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

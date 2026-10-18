@@ -4,8 +4,8 @@ import 'jobs/job_repository.dart';
 import 'navigation/app_shell.dart';
 import 'theme/app_theme.dart';
 
-final class EpisodeDownloaderApp extends StatelessWidget {
-  const EpisodeDownloaderApp({
+final class DownbeatApp extends StatelessWidget {
+  const DownbeatApp({
     required this.repository,
     this.simulateProgress = true,
     this.initialSharedUrl,

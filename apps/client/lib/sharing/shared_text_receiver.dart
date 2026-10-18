@@ -5,7 +5,7 @@ import 'shared_url_parser.dart';
 final class SharedTextReceiver {
   const SharedTextReceiver();
 
-  static const _channel = MethodChannel('episode_downloader/share');
+  static const _channel = MethodChannel('app.downbeat/share');
 
   Future<Uri?> initialUrl() async {
     try {
