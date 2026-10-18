@@ -43,7 +43,11 @@ class MainActivity : FlutterActivity() {
         })
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "app.downbeat/browser").setMethodCallHandler { call, result ->
             when (call.method) {
-                "getCookies" -> result.success(CookieManager.getInstance().getCookie(call.arguments as String))
+                "getCookies" -> {
+                    val manager = CookieManager.getInstance()
+                    manager.flush()
+                    result.success(manager.getCookie(call.arguments as String))
+                }
                 "enableAutofill" -> {
                     enableBrowserAutofill(window.decorView)
                     result.success(null)

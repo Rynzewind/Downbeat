@@ -20,16 +20,40 @@ final class JobWorkspace {
   Future<String> writeCookieFile(Uri source, String contents) async {
     final file = File(p.join(path, 'cookies.txt'));
     final lines = <String>['# Netscape HTTP Cookie File'];
+    final domain = _cookieDomain(source.host);
+    final includeSubdomains = domain.startsWith('.');
     for (final part in contents.split(';')) {
       final separator = part.indexOf('=');
       if (separator <= 0) continue;
       final name = part.substring(0, separator).trim();
       final value = part.substring(separator + 1).trim();
-      if (name.isEmpty || name.contains(RegExp(r'[\t\r\n]')) || value.contains(RegExp(r'[\t\r\n]'))) continue;
-      lines.add('${source.host}\tFALSE\t/\t${source.scheme == 'https' ? 'TRUE' : 'FALSE'}\t0\t$name\t$value');
+      if (name.isEmpty ||
+          name.contains(RegExp(r'[\t\r\n]')) ||
+          value.contains(RegExp(r'[\t\r\n]'))) {
+        continue;
+      }
+      lines.add(
+        '$domain\t${includeSubdomains ? 'TRUE' : 'FALSE'}\t/\t'
+        '${source.scheme == 'https' ? 'TRUE' : 'FALSE'}\t0\t$name\t$value',
+      );
     }
     await file.writeAsString('${lines.join('\n')}\n', flush: true);
     return file.path;
+  }
+
+  String _cookieDomain(String host) {
+    final normalized = host.toLowerCase();
+    for (final parent in const [
+      'youtube.com',
+      'facebook.com',
+      'instagram.com',
+      'tiktok.com',
+    ]) {
+      if (normalized == parent || normalized.endsWith('.$parent')) {
+        return '.$parent';
+      }
+    }
+    return normalized;
   }
 
   Future<void> cleanup() {
