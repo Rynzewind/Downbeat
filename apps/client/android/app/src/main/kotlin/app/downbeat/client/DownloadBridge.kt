@@ -75,9 +75,9 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
             if (level.equals("error", ignoreCase = true) || message.contains("ERROR:", ignoreCase = true)) {
                 diagnostic.set(message.takeLast(1000))
             }
-        }) { progress, _, _ ->
+        }) { progress, _, line ->
             val overall = if (format == "mp4") (progress * 0.75).toInt() else progress.toInt()
-            emit(mapOf("jobId" to jobId, "type" to "progress", "stage" to "downloading", "percent" to overall, "bytesReceived" to 0))
+            emitProgress(jobId, overall, line)
             notify("Downloading $overall%", overall)
         }
         Thread {
@@ -108,9 +108,9 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
                         if (level.equals("error", ignoreCase = true) || message.contains("ERROR:", ignoreCase = true)) {
                             diagnostic.set(message.takeLast(1000))
                         }
-                    }) { progress, _, _ ->
+                    }) { progress, _, line ->
                         val overall = 75 + (progress * 0.2).toInt()
-                        emit(mapOf("jobId" to jobId, "type" to "progress", "stage" to "downloading", "percent" to overall, "bytesReceived" to 0))
+                        emitProgress(jobId, overall, line)
                         notify("Downloading audio $overall%", overall)
                     }
                     active!!.get()
@@ -150,8 +150,51 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
     private fun configureSiteOptions(request: YtDlpRequest, url: String) {
         val host = runCatching { android.net.Uri.parse(url).host.orEmpty().lowercase() }.getOrDefault("")
         if (host == "youtube.com" || host.endsWith(".youtube.com") || host == "youtu.be") {
+            request.addOption("--extractor-args", "youtube:player_client=default,web_embedded")
             request.addOption("--remote-components", "ejs:github")
         }
+    }
+
+    private fun emitProgress(jobId: String, percent: Int, line: String) {
+        val details = parseProgress(line, percent)
+        emit(
+            mapOf(
+                "jobId" to jobId,
+                "type" to "progress",
+                "stage" to "downloading",
+                "percent" to percent,
+                "bytesReceived" to details.received,
+                "totalBytes" to details.total,
+                "message" to details.speed,
+            )
+        )
+    }
+
+    private fun parseProgress(line: String, percent: Int): DownloadDetails {
+        val totalMatch = Regex(
+            "(?i)of\\s+~?\\s*([0-9]+(?:\\.[0-9]+)?)\\s*([KMGT]?i?B)"
+        ).find(line)
+        val speedMatch = Regex(
+            "(?i)at\\s+([0-9]+(?:\\.[0-9]+)?)\\s*([KMGT]?i?B)/s"
+        ).find(line)
+        val total = totalMatch?.let {
+            byteCount(it.groupValues[1].toDoubleOrNull(), it.groupValues[2])
+        }
+        val received = total?.let { (it * percent.coerceIn(0, 100) / 100.0).toLong() } ?: 0L
+        val speed = speedMatch?.let { "Speed: ${it.groupValues[1]} ${it.groupValues[2]}/s" }
+        return DownloadDetails(received, total, speed)
+    }
+
+    private fun byteCount(value: Double?, unit: String): Long? {
+        if (value == null) return null
+        val multiplier = when (unit.uppercase()) {
+            "KIB", "KB" -> 1L shl 10
+            "MIB", "MB" -> 1L shl 20
+            "GIB", "GB" -> 1L shl 30
+            "TIB", "TB" -> 1L shl 40
+            else -> 1L
+        }
+        return (value * multiplier).toLong()
     }
 
     private fun safeFailure(details: String): Pair<String, String> {
@@ -183,6 +226,25 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
         .take(1200)
 
     private fun mergeMp4(video: File, audio: File, output: File) {
+        output.delete()
+        val copyCommand = "-y -i ${quote(video.absolutePath)} -i ${quote(audio.absolutePath)} " +
+            "-map 0:v:0 -map 1:a:0 -c:v copy -c:a aac -b:a 192k -movflags +faststart ${quote(output.absolutePath)}"
+        val copySession = FFmpegKit.execute(copyCommand)
+        if (ReturnCode.isSuccess(copySession.returnCode) && output.exists() && output.length() > 0L) return
+
+        output.delete()
+        val compatibleCommand = "-y -i ${quote(video.absolutePath)} -i ${quote(audio.absolutePath)} " +
+            "-map 0:v:0 -map 1:a:0 -c:v mpeg4 -q:v 4 -c:a aac -b:a 192k -movflags +faststart ${quote(output.absolutePath)}"
+        val compatibleSession = FFmpegKit.execute(compatibleCommand)
+        if (ReturnCode.isSuccess(compatibleSession.returnCode) && output.exists() && output.length() > 0L) return
+        throw IllegalStateException(
+            "Video conversion failed (${compatibleSession.returnCode}): " +
+                compatibleSession.allLogsAsString.takeLast(1200)
+        )
+    }
+
+    @Suppress("unused")
+    private fun mergeMp4WithPlatformMuxer(video: File, audio: File, output: File) {
         val videoExtractor = MediaExtractor()
         val audioExtractor = MediaExtractor()
         var muxer: MediaMuxer? = null
@@ -210,6 +272,12 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
         }
         if (!output.exists() || output.length() == 0L) throw IllegalStateException("Video merge failed")
     }
+
+    private data class DownloadDetails(
+        val received: Long,
+        val total: Long?,
+        val speed: String?,
+    )
 
     private fun findTrack(extractor: MediaExtractor, prefix: String): Int {
         for (index in 0 until extractor.trackCount) {
