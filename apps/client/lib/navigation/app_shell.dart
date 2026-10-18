@@ -10,12 +10,14 @@ final class AppShell extends StatefulWidget {
     required this.repository,
     this.coordinator,
     this.initialSharedUrl,
+    this.sharedUrls,
     this.enableNativeBrowser = false,
     super.key,
   });
   final JobRepository repository;
   final LocalJobCoordinator? coordinator;
   final Uri? initialSharedUrl;
+  final Stream<Uri>? sharedUrls;
   final bool enableNativeBrowser;
 
   @override
@@ -34,6 +36,7 @@ final class _AppShellState extends State<AppShell> {
           repository: widget.repository,
           coordinator: widget.coordinator,
           initialSharedUrl: widget.initialSharedUrl,
+          sharedUrls: widget.sharedUrls,
           enableNativeBrowser: widget.enableNativeBrowser,
         ),
         QueuePage(repository: widget.repository, coordinator: widget.coordinator),

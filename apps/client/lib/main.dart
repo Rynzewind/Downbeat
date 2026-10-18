@@ -7,16 +7,16 @@ import 'package:path_provider/path_provider.dart';
 
 import 'app.dart';
 import 'delivery/file_delivery.dart';
+import 'processing/android_local_processor.dart';
 import 'processing/local_job_coordinator.dart';
-import 'processing/local_processor.dart';
-import 'processing/processing_event.dart';
 import 'processing/windows_local_processor.dart';
 import 'sharing/shared_text_receiver.dart';
 import 'storage/repository_factory.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final sharedUrl = await const SharedTextReceiver().initialUrl();
+  const sharedReceiver = SharedTextReceiver();
+  final sharedUrl = await sharedReceiver.initialUrl();
   final repository = await openJobRepository();
   LocalJobCoordinator? coordinator;
   if (!kIsWeb) {
@@ -29,7 +29,7 @@ Future<void> main() async {
               'runtime',
             ),
           )
-        : const _PendingAndroidProcessor();
+        : AndroidLocalProcessor();
     coordinator = LocalJobCoordinator(
       processor: processor,
       repository: repository,
@@ -45,22 +45,9 @@ Future<void> main() async {
       repository: repository,
       coordinator: coordinator,
       initialSharedUrl: sharedUrl,
+      sharedUrls: sharedReceiver.urls,
       enableNativeBrowser: !kIsWeb,
     ),
   );
 }
 
-final class _PendingAndroidProcessor implements LocalProcessor {
-  const _PendingAndroidProcessor();
-
-  @override
-  Stream<ProcessingEvent> run(LocalProcessRequest request) => Stream.value(
-    const ProcessingEvent.failure(
-      category: 'unavailable',
-      message: 'The Android download engine is not available in this build.',
-    ),
-  );
-
-  @override
-  Future<void> cancel(String jobId) async {}
-}

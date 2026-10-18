@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../jobs/job.dart';
 import '../jobs/job_repository.dart';
 import '../processing/local_job_coordinator.dart';
 import '../theme/app_theme.dart';
+import 'browser_cookie_exporter.dart';
 import 'browser_controller.dart';
 import 'native_browser_surface.dart';
 
@@ -12,12 +15,14 @@ final class BrowserPage extends StatefulWidget {
     required this.repository,
     this.coordinator,
     this.initialSharedUrl,
+    this.sharedUrls,
     this.enableNativeBrowser = false,
     super.key,
   });
   final JobRepository repository;
   final LocalJobCoordinator? coordinator;
   final Uri? initialSharedUrl;
+  final Stream<Uri>? sharedUrls;
   final bool enableNativeBrowser;
 
   @override
@@ -28,6 +33,7 @@ final class _BrowserPageState extends State<BrowserPage>
     with AutomaticKeepAliveClientMixin {
   late final TextEditingController _address;
   Uri _current = Uri.parse('https://example.com');
+  StreamSubscription<Uri>? _sharedSubscription;
 
   @override
   bool get wantKeepAlive => true;
@@ -37,6 +43,11 @@ final class _BrowserPageState extends State<BrowserPage>
     super.initState();
     _current = widget.initialSharedUrl ?? _current;
     _address = TextEditingController(text: _current.toString());
+    _sharedSubscription = widget.sharedUrls?.listen((url) {
+      if (!mounted) return;
+      setState(() { _current = url; _address.text = url.toString(); });
+      WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) _chooseFormat(); });
+    });
     if (widget.initialSharedUrl != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _chooseFormat();
@@ -47,6 +58,7 @@ final class _BrowserPageState extends State<BrowserPage>
   @override
   void dispose() {
     _address.dispose();
+    unawaited(_sharedSubscription?.cancel());
     super.dispose();
   }
 
@@ -72,7 +84,8 @@ final class _BrowserPageState extends State<BrowserPage>
     if (format == null) return;
     final coordinator = widget.coordinator;
     if (coordinator != null) {
-      await coordinator.submit(_current, format);
+      final cookies = await const BrowserCookieExporter().cookieHeaderFor(_current);
+      await coordinator.submit(_current, format, cookieHeader: cookies);
     } else {
       await widget.repository.upsert(Job(
         id: DateTime.now().microsecondsSinceEpoch.toString(),
