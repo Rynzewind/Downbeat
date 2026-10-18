@@ -139,6 +139,12 @@ final class _BrowserPageState extends State<BrowserPage>
                           child: TextField(
                             key: const Key('browser-address'),
                             controller: _address,
+                            onTap: () {
+                              _address.selection = TextSelection(
+                                baseOffset: 0,
+                                extentOffset: _address.text.length,
+                              );
+                            },
                             onSubmitted: (_) => _navigate(),
                             decoration: InputDecoration(
                               hintText: 'Enter a web address',

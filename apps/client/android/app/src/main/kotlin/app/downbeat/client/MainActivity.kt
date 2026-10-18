@@ -48,8 +48,8 @@ class MainActivity : FlutterActivity() {
                     manager.flush()
                     result.success(manager.getCookie(call.arguments as String))
                 }
-                "enableAutofill" -> {
-                    enableBrowserAutofill(window.decorView)
+                "configureBrowser" -> {
+                    configureBrowser(window.decorView)
                     result.success(null)
                 }
                 else -> result.notImplemented()
@@ -215,16 +215,32 @@ class MainActivity : FlutterActivity() {
             null
         }
 
-    private fun enableBrowserAutofill(view: View) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+    private fun configureBrowser(view: View) {
         if (view is WebView) {
-            view.importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_YES
+            val cookies = CookieManager.getInstance()
+            cookies.setAcceptCookie(true)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                cookies.setAcceptThirdPartyCookies(view, true)
+            }
+            view.settings.domStorageEnabled = true
+            view.settings.databaseEnabled = true
+            view.settings.userAgentString = chromeCompatibleUserAgent(
+                view.settings.userAgentString
+            )
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                view.importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_YES
+            }
             return
         }
         if (view is ViewGroup) {
-            for (index in 0 until view.childCount) enableBrowserAutofill(view.getChildAt(index))
+            for (index in 0 until view.childCount) configureBrowser(view.getChildAt(index))
         }
     }
+
+    private fun chromeCompatibleUserAgent(userAgent: String): String =
+        userAgent
+            .replace("; wv", "")
+            .replace(Regex("\\sVersion/4\\.0"), "")
 
     companion object {
         private const val FOLDER_PICKER_REQUEST = 4103

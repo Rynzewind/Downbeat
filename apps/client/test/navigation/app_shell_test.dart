@@ -11,6 +11,20 @@ void main() {
     expect(app.title, 'Downbeat');
   });
 
+  testWidgets('selects the full address when the address bar is tapped', (
+    tester,
+  ) async {
+    await tester.pumpWidget(DownbeatApp(repository: MemoryJobRepository()));
+
+    final addressFinder = find.byKey(const Key('browser-address'));
+    await tester.tap(addressFinder);
+    await tester.pump();
+
+    final field = tester.widget<TextField>(addressFinder);
+    expect(field.controller!.selection.start, 0);
+    expect(field.controller!.selection.end, field.controller!.text.length);
+  });
+
   testWidgets('switches between persistent Browser and Queue destinations', (
     tester,
   ) async {

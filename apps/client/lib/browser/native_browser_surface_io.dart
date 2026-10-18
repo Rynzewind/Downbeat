@@ -97,7 +97,7 @@ final class _NativeBrowserSurfaceState extends State<NativeBrowserSurface> {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             unawaited(
               const MethodChannel('app.downbeat/browser')
-                  .invokeMethod<void>('enableAutofill'),
+                  .invokeMethod<void>('configureBrowser'),
             );
           });
         }
