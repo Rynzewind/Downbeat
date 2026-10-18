@@ -7,6 +7,7 @@ import android.os.Looper
 import androidx.core.content.ContextCompat
 import com.arthenica.ffmpegkit.FFmpegKit
 import com.arthenica.ffmpegkit.ReturnCode
+import com.chaquo.python.Python
 import dev.ffmpegkit_maintained.ytdlp.YtDlp
 import dev.ffmpegkit_maintained.ytdlp.YtDlpRequest
 import io.flutter.plugin.common.EventChannel
@@ -14,6 +15,7 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
 import java.util.concurrent.Future
+import java.util.concurrent.atomic.AtomicReference
 
 class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHandler, EventChannel.StreamHandler {
     private val main = Handler(Looper.getMainLooper())
@@ -21,7 +23,11 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
     private var active: Future<*>? = null
     private var activeJobId: String? = null
 
-    init { instance = this; YtDlp.init(context.applicationContext) }
+    init {
+        instance = this
+        YtDlp.init(context.applicationContext)
+        installCurrentYtDlp(context.applicationContext)
+    }
 
     override fun onListen(arguments: Any?, events: EventChannel.EventSink?) { sink = events }
     override fun onCancel(arguments: Any?) { sink = null }
@@ -47,11 +53,17 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
             .addOption("--no-playlist")
             .addOption("--no-part")
             .addOption("--format", if (format == "mp3") "bestaudio/best" else "bestvideo[ext=mp4][height<=720]/bestvideo[height<=720]")
+        configureSiteOptions(request, url)
         if (cookies != null) request.addOption("--cookies", cookies)
         activeJobId = jobId
         ContextCompat.startForegroundService(context, Intent(context, DownbeatDownloadService::class.java))
         emit(mapOf("jobId" to jobId, "type" to "stage", "stage" to "fetching", "message" to "Finding media"))
-        active = YtDlp.executeAsync(request) { progress, _, _ ->
+        val diagnostic = AtomicReference("")
+        active = YtDlp.executeDebug(request, { level, message ->
+            if (level.equals("error", ignoreCase = true) || message.contains("ERROR:", ignoreCase = true)) {
+                diagnostic.set(message.takeLast(1000))
+            }
+        }) { progress, _, _ ->
             val overall = if (format == "mp4") (progress * 0.75).toInt() else progress.toInt()
             emit(mapOf("jobId" to jobId, "type" to "progress", "stage" to "downloading", "percent" to overall, "bytesReceived" to 0))
             notify("Downloading $overall%", overall)
@@ -76,8 +88,13 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
                         .addOption("--no-playlist")
                         .addOption("--no-part")
                         .addOption("--format", "bestaudio[ext=m4a]/bestaudio")
+                    configureSiteOptions(audioRequest, url)
                     if (cookies != null) audioRequest.addOption("--cookies", cookies)
-                    active = YtDlp.executeAsync(audioRequest) { progress, _, _ ->
+                    active = YtDlp.executeDebug(audioRequest, { level, message ->
+                        if (level.equals("error", ignoreCase = true) || message.contains("ERROR:", ignoreCase = true)) {
+                            diagnostic.set(message.takeLast(1000))
+                        }
+                    }) { progress, _, _ ->
                         val overall = 75 + (progress * 0.2).toInt()
                         emit(mapOf("jobId" to jobId, "type" to "progress", "stage" to "downloading", "percent" to overall, "bytesReceived" to 0))
                         notify("Downloading audio $overall%", overall)
@@ -98,8 +115,9 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
                 emit(mapOf("jobId" to jobId, "type" to "artifact", "path" to artifact.absolutePath, "filename" to artifact.name, "mediaType" to if (format == "mp3") "audio/mpeg" else "video/mp4", "size" to artifact.length()))
                 notify("Download completed", 100)
             } catch (error: Exception) {
-                val protected = error.message?.contains("DRM", ignoreCase = true) == true
-                emit(mapOf("jobId" to jobId, "type" to "failure", "category" to if (protected) "protected_media" else "download", "message" to if (protected) "This protected media cannot be downloaded." else "Downbeat could not download media from this page."))
+                val details = listOfNotNull(error.message, error.cause?.message, diagnostic.get()).joinToString(" ")
+                val failure = safeFailure(details)
+                emit(mapOf("jobId" to jobId, "type" to "failure", "category" to failure.first, "message" to failure.second))
             } finally {
                 active = null; activeJobId = null
                 context.stopService(Intent(context, DownbeatDownloadService::class.java))
@@ -115,6 +133,46 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
         main.post { manager.notify(DownloadNotification.NOTIFICATION_ID, DownloadNotification.build(context, text, progress)) }
     }
     private fun quote(value: String) = "\"${value.replace("\"", "\\\"")}\""
+
+    private fun configureSiteOptions(request: YtDlpRequest, url: String) {
+        val host = runCatching { android.net.Uri.parse(url).host.orEmpty().lowercase() }.getOrDefault("")
+        if (host == "youtube.com" || host.endsWith(".youtube.com") || host == "youtu.be") {
+            request.addOption("--extractor-args", "youtube:player_client=visionos")
+            request.addOption("--remote-components", "ejs:github")
+        }
+    }
+
+    private fun safeFailure(details: String): Pair<String, String> {
+        val value = details.lowercase()
+        return when {
+            "drm" in value -> "protected_media" to "This protected media cannot be downloaded."
+            "sign in" in value || "not a bot" in value || "cookies" in value ->
+                "authentication" to "This site needs a signed-in browser session. Sign in inside Downbeat, then try again."
+            "private video" in value -> "authentication" to "This video is private or your Downbeat browser is not signed in to the account that can view it."
+            "video unavailable" in value || "not available" in value ->
+                "unavailable" to "This video is unavailable to this device or account."
+            "geo" in value || "country" in value ->
+                "unavailable" to "This video is not available in your current region."
+            "requested format" in value ->
+                "format" to "That video does not offer a compatible stream. Try the other format."
+            "javascript" in value || "js runtime" in value || "signature" in value ->
+                "extractor" to "YouTube changed its player. This Downbeat build needs an extractor update."
+            else -> "download" to "Downbeat could not download this page. The site rejected the media request."
+        }
+    }
+
+    private fun installCurrentYtDlp(appContext: Context) {
+        val assetName = "python/yt_dlp-2026.10.10.233141.dev0-py3-none-any.whl"
+        val wheel = File(appContext.filesDir, assetName.substringAfterLast('/'))
+        if (!wheel.exists() || wheel.length() == 0L) {
+            appContext.assets.open(assetName).use { input ->
+                wheel.outputStream().use { output -> input.copyTo(output) }
+            }
+        }
+        val python = Python.getInstance()
+        python.getModule("sys").get("path")?.callAttr("insert", 0, wheel.absolutePath)
+        python.getModule("importlib").callAttr("invalidate_caches")
+    }
 
     companion object {
         private var instance: DownloadBridge? = null

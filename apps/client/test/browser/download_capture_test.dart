@@ -30,6 +30,7 @@ void main() {
 
     expect(repository.current, hasLength(1));
     expect(repository.current.single.format.name, 'mp3');
+    expect(find.text('Download queue'), findsOneWidget);
   });
 
   testWidgets('shared URL opens the same format picker on launch', (

@@ -38,6 +38,7 @@ final class _AppShellState extends State<AppShell> {
           initialSharedUrl: widget.initialSharedUrl,
           sharedUrls: widget.sharedUrls,
           enableNativeBrowser: widget.enableNativeBrowser,
+          onJobSubmitted: () => setState(() => _selected = 1),
         ),
         QueuePage(repository: widget.repository, coordinator: widget.coordinator),
       ],

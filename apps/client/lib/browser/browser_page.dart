@@ -18,6 +18,7 @@ final class BrowserPage extends StatefulWidget {
     this.initialSharedUrl,
     this.sharedUrls,
     this.enableNativeBrowser = false,
+    this.onJobSubmitted,
     super.key,
   });
   final JobRepository repository;
@@ -25,6 +26,7 @@ final class BrowserPage extends StatefulWidget {
   final Uri? initialSharedUrl;
   final Stream<Uri>? sharedUrls;
   final bool enableNativeBrowser;
+  final VoidCallback? onJobSubmitted;
 
   @override
   State<BrowserPage> createState() => _BrowserPageState();
@@ -106,6 +108,7 @@ final class _BrowserPageState extends State<BrowserPage>
         ),
       );
     }
+    widget.onJobSubmitted?.call();
   }
 
   @override
