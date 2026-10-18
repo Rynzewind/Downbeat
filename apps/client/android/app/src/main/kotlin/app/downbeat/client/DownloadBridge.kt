@@ -102,10 +102,13 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
                     active!!.get()
                     val audio = workspace.walkTopDown().filter { it.isFile && it.name.startsWith("downbeat-audio.") }.firstOrNull()
                         ?: throw IllegalStateException("No audio stream was produced")
-                    emit(mapOf("jobId" to jobId, "type" to "stage", "stage" to "converting", "message" to "Merging video and audio"))
+                    emit(mapOf("jobId" to jobId, "type" to "stage", "stage" to "converting", "message" to "Finalising video"))
                     val baseName = video.name.replace(Regex("\\.video\\.[^.]+$"), "")
                     val merged = File(workspace, "$baseName.mp4")
-                    val command = "-y -i ${quote(video.absolutePath)} -i ${quote(audio.absolutePath)} -c:v copy -c:a aac -movflags +faststart ${quote(merged.absolutePath)}"
+                    // Both selected YouTube streams already use MP4-compatible codecs. Copying
+                    // their packets avoids the heavier AAC re-encode which can exhaust or crash
+                    // the native process on some phones.
+                    val command = "-y -i ${quote(video.absolutePath)} -i ${quote(audio.absolutePath)} -map 0:v:0 -map 1:a:0 -c copy ${quote(merged.absolutePath)}"
                     val session = FFmpegKit.execute(command)
                     if (!ReturnCode.isSuccess(session.returnCode)) throw IllegalStateException("Video merge failed")
                     video.delete()
