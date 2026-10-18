@@ -72,8 +72,12 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
         emit(mapOf("jobId" to jobId, "type" to "stage", "stage" to "fetching", "message" to "Finding media"))
         val diagnostic = AtomicReference("")
         active = YtDlp.executeDebug(request, { level, message ->
-            if (level.equals("error", ignoreCase = true) || message.contains("ERROR:", ignoreCase = true)) {
-                diagnostic.set(message.takeLast(1000))
+            if (level.equals("error", ignoreCase = true) ||
+                level.equals("warning", ignoreCase = true) ||
+                message.contains("ERROR:", ignoreCase = true) ||
+                message.contains("WARNING:", ignoreCase = true)
+            ) {
+                diagnostic.updateAndGet { "$it\n$message".takeLast(3000) }
             }
         }) { progress, _, line ->
             val overall = if (format == "mp4") (progress * 0.75).toInt() else progress.toInt()
@@ -105,8 +109,12 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
                     configureSiteOptions(audioRequest, url)
                     if (cookies != null) audioRequest.addOption("--cookies", cookies)
                     active = YtDlp.executeDebug(audioRequest, { level, message ->
-                        if (level.equals("error", ignoreCase = true) || message.contains("ERROR:", ignoreCase = true)) {
-                            diagnostic.set(message.takeLast(1000))
+                        if (level.equals("error", ignoreCase = true) ||
+                            level.equals("warning", ignoreCase = true) ||
+                            message.contains("ERROR:", ignoreCase = true) ||
+                            message.contains("WARNING:", ignoreCase = true)
+                        ) {
+                            diagnostic.updateAndGet { "$it\n$message".takeLast(3000) }
                         }
                     }) { progress, _, line ->
                         val overall = 75 + (progress * 0.2).toInt()
@@ -150,7 +158,10 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
     private fun configureSiteOptions(request: YtDlpRequest, url: String) {
         val host = runCatching { android.net.Uri.parse(url).host.orEmpty().lowercase() }.getOrDefault("")
         if (host == "youtube.com" || host.endsWith(".youtube.com") || host == "youtu.be") {
-            request.addOption("--extractor-args", "youtube:player_client=default,web_embedded")
+            request.addOption(
+                "--extractor-args",
+                "youtube:player_client=web_safari,web_embedded,-tv_downgraded;formats=missing_pot"
+            )
             request.addOption("--remote-components", "ejs:github")
         }
     }
