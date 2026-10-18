@@ -5,6 +5,7 @@ import android.content.Intent
 import android.media.MediaCodec
 import android.media.MediaExtractor
 import android.media.MediaFormat
+import android.media.MediaMetadataRetriever
 import android.media.MediaMuxer
 import android.os.Handler
 import android.os.Looper
@@ -19,8 +20,10 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
 import java.nio.ByteBuffer
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 
 class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHandler, EventChannel.StreamHandler {
@@ -87,7 +90,7 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
                 diagnostic.updateAndGet { "$it\n$message".takeLast(8000) }
             }
         }) { progress, _, line ->
-            val overall = if (format == "mp4") (progress * 0.75).toInt() else progress.toInt()
+            val overall = if (format == "mp4") (progress * 0.75).toInt() else (progress * 0.8).toInt()
             emitProgress(jobId, overall, line)
             notify("Downloading $overall%", overall)
         }
@@ -97,10 +100,16 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
                 var artifact = workspace.walkTopDown().filter { it.isFile && it.name != "cookies.txt" }.maxByOrNull { it.lastModified() }
                     ?: throw IllegalStateException("No downloaded file was produced")
                 if (format == "mp3") {
-                    emit(mapOf("jobId" to jobId, "type" to "stage", "stage" to "converting", "message" to "Converting audio"))
                     val converted = File(workspace, artifact.name.substringBeforeLast('.') + ".mp3")
                     val command = "-y -i ${quote(artifact.absolutePath)} -vn -codec:a libmp3lame ${quote(converted.absolutePath)}"
-                    val session = FFmpegKit.execute(command)
+                    val session = executeFfmpegWithProgress(
+                        command = command,
+                        jobId = jobId,
+                        input = artifact,
+                        startPercent = 80,
+                        endPercent = 99,
+                        label = "Converting audio",
+                    )
                     if (!ReturnCode.isSuccess(session.returnCode)) {
                         throw IllegalStateException("Audio conversion failed (${session.returnCode}): ${session.allLogsAsString.takeLast(1200)}")
                     }
@@ -136,10 +145,9 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
                     active!!.get()
                     val audio = workspace.walkTopDown().filter { it.isFile && it.name.startsWith("downbeat-audio.") }.firstOrNull()
                         ?: throw IllegalStateException("No audio stream was produced")
-                    emit(mapOf("jobId" to jobId, "type" to "stage", "stage" to "converting", "message" to "Finalising video"))
                     val baseName = video.name.replace(Regex("\\.video\\.[^.]+$"), "")
                     val merged = File(workspace, "$baseName.mp4")
-                    mergeMp4(video, audio, merged)
+                    mergeMp4(jobId, video, audio, merged)
                     video.delete()
                     audio.delete()
                     artifact = merged
@@ -214,6 +222,22 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
         )
     }
 
+    private fun emitConversionProgress(jobId: String, progress: ConversionProgress, label: String) {
+        val message = progress.message(label)
+        emit(
+            mapOf(
+                "jobId" to jobId,
+                "type" to "progress",
+                "stage" to "converting",
+                "percent" to progress.overallPercent,
+                "bytesReceived" to 0L,
+                "totalBytes" to null,
+                "message" to message,
+            )
+        )
+        notify(message, progress.overallPercent)
+    }
+
     private fun parseProgress(line: String, percent: Int): DownloadDetails {
         val totalMatch = Regex(
             "(?i)of\\s+~?\\s*([0-9]+(?:\\.[0-9]+)?)\\s*([KMGT]?i?B)"
@@ -269,17 +293,64 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
         .replace(Regex("\\s+"), " ")
         .take(3000)
 
-    private fun mergeMp4(video: File, audio: File, output: File) {
+    private fun executeFfmpegWithProgress(
+        command: String,
+        jobId: String,
+        input: File,
+        startPercent: Int,
+        endPercent: Int,
+        label: String,
+        minimumOverallPercent: AtomicInteger = AtomicInteger(startPercent - 1),
+    ): com.arthenica.ffmpegkit.FFmpegSession {
+        val duration = mediaDurationMilliseconds(input)
+        emitConversionProgress(jobId, ConversionProgress.calculate(0, duration, null, startPercent, endPercent), label)
+        val finished = CountDownLatch(1)
+        val session = FFmpegKit.executeAsync(
+            command,
+            { finished.countDown() },
+            null,
+            { statistics ->
+                val progress = ConversionProgress.calculate(
+                    processedMilliseconds = statistics.time.toLong(),
+                    durationMilliseconds = duration,
+                    processingSpeed = statistics.speed,
+                    startPercent = startPercent,
+                    endPercent = endPercent,
+                )
+                val overall = progress.overallPercent
+                if (overall != null && overall > minimumOverallPercent.getAndUpdate { previous -> maxOf(previous, overall) }) {
+                    emitConversionProgress(jobId, progress, label)
+                }
+            },
+        )
+        finished.await()
+        return session
+    }
+
+    private fun mediaDurationMilliseconds(input: File): Long? {
+        val retriever = MediaMetadataRetriever()
+        return try {
+            retriever.setDataSource(input.absolutePath)
+            retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
+        } catch (_: RuntimeException) {
+            null
+        } finally {
+            retriever.release()
+        }
+    }
+
+    private fun mergeMp4(jobId: String, video: File, audio: File, output: File) {
         output.delete()
+        val highestProgress = AtomicInteger(94)
         val copyCommand = "-y -i ${quote(video.absolutePath)} -i ${quote(audio.absolutePath)} " +
             "-map 0:v:0 -map 1:a:0 -c:v copy -c:a aac -b:a 192k -movflags +faststart ${quote(output.absolutePath)}"
-        val copySession = FFmpegKit.execute(copyCommand)
+        val copySession = executeFfmpegWithProgress(copyCommand, jobId, video, 95, 99, "Finalising video", highestProgress)
         if (ReturnCode.isSuccess(copySession.returnCode) && output.exists() && output.length() > 0L) return
 
         output.delete()
         val compatibleCommand = "-y -i ${quote(video.absolutePath)} -i ${quote(audio.absolutePath)} " +
             "-map 0:v:0 -map 1:a:0 -c:v mpeg4 -q:v 4 -c:a aac -b:a 192k -movflags +faststart ${quote(output.absolutePath)}"
-        val compatibleSession = FFmpegKit.execute(compatibleCommand)
+        val compatibleSession = executeFfmpegWithProgress(compatibleCommand, jobId, video, 95, 99, "Converting video", highestProgress)
         if (ReturnCode.isSuccess(compatibleSession.returnCode) && output.exists() && output.length() > 0L) return
         throw IllegalStateException(
             "Video conversion failed (${compatibleSession.returnCode}): " +
