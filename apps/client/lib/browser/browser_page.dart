@@ -8,6 +8,7 @@ import '../processing/local_job_coordinator.dart';
 import '../theme/app_theme.dart';
 import 'browser_cookie_exporter.dart';
 import 'browser_controller.dart';
+import 'browser_navigation_controller.dart';
 import 'native_browser_surface.dart';
 
 final class BrowserPage extends StatefulWidget {
@@ -34,6 +35,7 @@ final class _BrowserPageState extends State<BrowserPage>
   late final TextEditingController _address;
   Uri _current = Uri.parse('https://example.com');
   StreamSubscription<Uri>? _sharedSubscription;
+  final _navigation = BrowserNavigationController();
 
   @override
   bool get wantKeepAlive => true;
@@ -45,8 +47,13 @@ final class _BrowserPageState extends State<BrowserPage>
     _address = TextEditingController(text: _current.toString());
     _sharedSubscription = widget.sharedUrls?.listen((url) {
       if (!mounted) return;
-      setState(() { _current = url; _address.text = url.toString(); });
-      WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) _chooseFormat(); });
+      setState(() {
+        _current = url;
+        _address.text = url.toString();
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _chooseFormat();
+      });
     });
     if (widget.initialSharedUrl != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -84,16 +91,20 @@ final class _BrowserPageState extends State<BrowserPage>
     if (format == null) return;
     final coordinator = widget.coordinator;
     if (coordinator != null) {
-      final cookies = await const BrowserCookieExporter().cookieHeaderFor(_current);
+      final cookies = await const BrowserCookieExporter().cookieHeaderFor(
+        _current,
+      );
       await coordinator.submit(_current, format, cookieHeader: cookies);
     } else {
-      await widget.repository.upsert(Job(
-        id: DateTime.now().microsecondsSinceEpoch.toString(),
-        sourceUrl: _current,
-        format: format,
-        title: _current.host,
-        createdAt: DateTime.now().toUtc(),
-      ));
+      await widget.repository.upsert(
+        Job(
+          id: DateTime.now().microsecondsSinceEpoch.toString(),
+          sourceUrl: _current,
+          format: format,
+          title: _current.host,
+          createdAt: DateTime.now().toUtc(),
+        ),
+      );
     }
   }
 
@@ -106,36 +117,79 @@ final class _BrowserPageState extends State<BrowserPage>
           children: [
             SafeArea(
               bottom: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-                child: Row(
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Image.asset(
-                        'assets/icon.png',
-                        width: 42,
-                        height: 42,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextField(
-                        key: const Key('browser-address'),
-                        controller: _address,
-                        onSubmitted: (_) => _navigate(),
-                        decoration: InputDecoration(
-                          hintText: 'Enter a web address',
-                          prefixIcon: const Icon(Icons.lock_outline, size: 18),
-                          suffixIcon: IconButton(
-                            onPressed: _navigate,
-                            icon: const Icon(Icons.arrow_forward_rounded),
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+                    child: Row(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.asset(
+                            'assets/icon.png',
+                            width: 42,
+                            height: 42,
                           ),
                         ),
-                      ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextField(
+                            key: const Key('browser-address'),
+                            controller: _address,
+                            onSubmitted: (_) => _navigate(),
+                            decoration: InputDecoration(
+                              hintText: 'Enter a web address',
+                              prefixIcon: const Icon(
+                                Icons.lock_outline,
+                                size: 18,
+                              ),
+                              suffixIcon: IconButton(
+                                onPressed: _navigate,
+                                icon: const Icon(Icons.arrow_forward_rounded),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          key: const Key('browser-back'),
+                          tooltip: 'Back',
+                          onPressed: _navigation.back,
+                          icon: const Icon(Icons.arrow_back_rounded),
+                        ),
+                        IconButton(
+                          key: const Key('browser-forward'),
+                          tooltip: 'Forward',
+                          onPressed: _navigation.forward,
+                          icon: const Icon(Icons.arrow_forward_rounded),
+                        ),
+                        IconButton(
+                          key: const Key('browser-reload'),
+                          tooltip: 'Reload',
+                          onPressed: _navigation.reload,
+                          icon: const Icon(Icons.refresh_rounded),
+                        ),
+                        IconButton(
+                          key: const Key('browser-home'),
+                          tooltip: 'Home',
+                          onPressed: () {
+                            setState(() {
+                              _current = Uri.parse('https://www.google.com');
+                              _address.text = _current.toString();
+                            });
+                          },
+                          icon: const Icon(Icons.home_outlined),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
             Expanded(
@@ -152,6 +206,7 @@ final class _BrowserPageState extends State<BrowserPage>
                         borderRadius: BorderRadius.circular(24),
                         child: NativeBrowserSurface(
                           url: _current,
+                          navigationController: _navigation,
                           onUrlChanged: (url) {
                             if (!mounted || url == _current) return;
                             setState(() {

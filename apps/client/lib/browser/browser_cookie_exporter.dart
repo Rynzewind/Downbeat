@@ -6,7 +6,10 @@ final class BrowserCookieExporter {
 
   Future<String?> cookieHeaderFor(Uri target) async {
     try {
-      final value = await _channel.invokeMethod<String>('getCookies', target.toString());
+      final value = await _channel.invokeMethod<String>(
+        'getCookies',
+        target.toString(),
+      );
       return value == null || value.trim().isEmpty ? null : value;
     } on MissingPluginException {
       return null;

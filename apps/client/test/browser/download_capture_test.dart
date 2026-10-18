@@ -4,13 +4,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  testWidgets('shows standard browser navigation controls', (tester) async {
+    await tester.pumpWidget(DownbeatApp(repository: MemoryJobRepository()));
+
+    expect(find.byKey(const Key('browser-back')), findsOneWidget);
+    expect(find.byKey(const Key('browser-forward')), findsOneWidget);
+    expect(find.byKey(const Key('browser-reload')), findsOneWidget);
+    expect(find.byKey(const Key('browser-home')), findsOneWidget);
+  });
+
   testWidgets('floating action asks for MP4 or MP3 and queues selection', (
     tester,
   ) async {
     final repository = MemoryJobRepository();
-    await tester.pumpWidget(
-      DownbeatApp(repository: repository),
-    );
+    await tester.pumpWidget(DownbeatApp(repository: repository));
 
     await tester.tap(find.byKey(const Key('download-fab')));
     await tester.pumpAndSettle();
