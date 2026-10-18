@@ -1,13 +1,14 @@
 # Downbeat
 
-Personal Android and Windows media downloader with an in-app browser, device-local queue, and cloud processing.
+Personal Android and Windows media downloader with an in-app browser and a device-local queue and processor. No Downbeat server is required.
 
-The first development slice runs with a simulated processor so the client experience can be tested before Cloudflare deployment.
+The Android build accepts shared links, keeps downloads alive with a foreground notification, and saves completed files locally. The Windows build bundles pinned yt-dlp and FFmpeg tools.
 
 ## Development
 
 - `make generate` prepares derived brand assets.
 - `make test` runs contract, tool, and Flutter tests.
 - `make lint` analyzes the Flutter client.
+- `powershell -ExecutionPolicy Bypass -File tools/build_test_release.ps1` builds test APK and Windows ZIP artifacts in `dist/`.
 
-See the approved [design](docs/superpowers/specs/2026-10-17-cross-platform-media-downloader-design.md) and [implementation plan](docs/superpowers/plans/2026-10-17-cross-platform-media-downloader.md).
+Only download media you are permitted to save. Downbeat reports protected/DRM media as unsupported and does not bypass protection.

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/services.dart';
 
 import '../jobs/job.dart';
@@ -13,19 +15,27 @@ final class AndroidLocalProcessor implements LocalProcessor {
 
   @override
   Stream<ProcessingEvent> run(LocalProcessRequest request) async* {
-    final events = _events.where((raw) => raw is Map && raw['jobId'] == request.jobId);
-    await _methods.invokeMethod<void>('start', {
-      'jobId': request.jobId,
-      'url': request.sourceUrl.toString(),
-      'format': request.format.name,
-      'workspacePath': request.workspacePath,
-      'cookieFilePath': request.cookieFilePath,
-    });
-    await for (final raw in events) {
-      final event = _decode(Map<dynamic, dynamic>.from(raw as Map));
-      if (event == null) continue;
-      yield event;
-      if (event.type == ProcessingEventType.artifact || event.type == ProcessingEventType.failure) break;
+    final received = StreamController<ProcessingEvent>();
+    final subscription = _events.listen((raw) {
+      if (raw is! Map || raw['jobId'] != request.jobId) return;
+      final event = _decode(Map<dynamic, dynamic>.from(raw));
+      if (event != null) received.add(event);
+    }, onError: received.addError);
+    try {
+      await _methods.invokeMethod<void>('start', {
+        'jobId': request.jobId,
+        'url': request.sourceUrl.toString(),
+        'format': request.format.name,
+        'workspacePath': request.workspacePath,
+        'cookieFilePath': request.cookieFilePath,
+      });
+      await for (final event in received.stream) {
+        yield event;
+        if (event.type == ProcessingEventType.artifact || event.type == ProcessingEventType.failure) break;
+      }
+    } finally {
+      await subscription.cancel();
+      await received.close();
     }
   }
 

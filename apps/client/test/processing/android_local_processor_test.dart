@@ -15,7 +15,12 @@ void main() {
   test('serializes start and cancel requests without flattening arguments', () async {
     final calls = <MethodCall>[];
     messenger.setMockMethodCallHandler(methods, (call) async { calls.add(call); return null; });
-    final processor = AndroidLocalProcessor(eventStream: const Stream.empty());
+    final processor = AndroidLocalProcessor(eventStream: Stream.value({
+      'jobId': 'j1',
+      'type': 'failure',
+      'category': 'test',
+      'message': 'finished test run',
+    }));
     await processor.run(LocalProcessRequest(
       jobId: 'j1',
       sourceUrl: Uri.parse('https://example.com/v?a=1&b=2'),

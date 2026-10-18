@@ -17,6 +17,7 @@ __pycache__/
 
 # Flutter and platform builds
 build/
+dist/
 **/android/.gradle/
 **/android/local.properties
 **/windows/flutter/ephemeral/
