@@ -28,4 +28,10 @@ class YouTubeRuntimeOptionsTest {
             ),
         )
     }
+
+    @Test
+    fun `public YouTube downloads do not attach account cookies`() {
+        assertEquals(false, YouTubeRuntimeOptions.shouldAttachCookies("https://youtu.be/SFZn5HKpO18"))
+        assertEquals(true, YouTubeRuntimeOptions.shouldAttachCookies("https://www.bbc.co.uk/iplayer/episode/example"))
+    }
 }

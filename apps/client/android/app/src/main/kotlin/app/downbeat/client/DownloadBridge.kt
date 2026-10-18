@@ -68,7 +68,9 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
                 }
             )
         configureSiteOptions(request, url)
-        if (cookies != null) request.addOption("--cookies", cookies)
+        if (cookies != null && YouTubeRuntimeOptions.shouldAttachCookies(url)) {
+            request.addOption("--cookies", cookies)
+        }
         activeJobId = jobId
         ContextCompat.startForegroundService(context, Intent(context, DownbeatDownloadService::class.java))
         emit(mapOf("jobId" to jobId, "type" to "stage", "stage" to "fetching", "message" to "Finding media"))
@@ -112,7 +114,9 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
                         .addOption("--no-part")
                         .addOption("--format", "bestaudio[ext=m4a]/bestaudio")
                     configureSiteOptions(audioRequest, url)
-                    if (cookies != null) audioRequest.addOption("--cookies", cookies)
+                    if (cookies != null && YouTubeRuntimeOptions.shouldAttachCookies(url)) {
+                        audioRequest.addOption("--cookies", cookies)
+                    }
                     active = YtDlp.executeDebug(audioRequest, { level, message ->
                         if (level.equals("error", ignoreCase = true) ||
                             level.equals("warning", ignoreCase = true) ||
