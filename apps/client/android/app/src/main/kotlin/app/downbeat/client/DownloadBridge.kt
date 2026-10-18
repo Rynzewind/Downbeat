@@ -2,6 +2,10 @@ package app.downbeat.client
 
 import android.content.Context
 import android.content.Intent
+import android.media.MediaCodec
+import android.media.MediaExtractor
+import android.media.MediaFormat
+import android.media.MediaMuxer
 import android.os.Handler
 import android.os.Looper
 import androidx.core.content.ContextCompat
@@ -14,6 +18,7 @@ import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
+import java.nio.ByteBuffer
 import java.util.concurrent.Future
 import java.util.concurrent.atomic.AtomicReference
 
@@ -52,7 +57,7 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
         val request = YtDlpRequest(url).setOutputTemplate(output.absolutePath)
             .addOption("--no-playlist")
             .addOption("--no-part")
-            .addOption("--format", if (format == "mp3") "bestaudio/best" else "bestvideo[ext=mp4][height<=720]/bestvideo[height<=720]")
+            .addOption("--format", if (format == "mp3") "bestaudio/best" else "bestvideo[ext=mp4][vcodec^=avc1][height<=720]/bestvideo[ext=mp4][height<=720]/bestvideo[height<=720]")
         configureSiteOptions(request, url)
         if (cookies != null) request.addOption("--cookies", cookies)
         activeJobId = jobId
@@ -105,19 +110,14 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
                     emit(mapOf("jobId" to jobId, "type" to "stage", "stage" to "converting", "message" to "Finalising video"))
                     val baseName = video.name.replace(Regex("\\.video\\.[^.]+$"), "")
                     val merged = File(workspace, "$baseName.mp4")
-                    // Both selected YouTube streams already use MP4-compatible codecs. Copying
-                    // their packets avoids the heavier AAC re-encode which can exhaust or crash
-                    // the native process on some phones.
-                    val command = "-y -i ${quote(video.absolutePath)} -i ${quote(audio.absolutePath)} -map 0:v:0 -map 1:a:0 -c copy ${quote(merged.absolutePath)}"
-                    val session = FFmpegKit.execute(command)
-                    if (!ReturnCode.isSuccess(session.returnCode)) throw IllegalStateException("Video merge failed")
+                    mergeMp4(video, audio, merged)
                     video.delete()
                     audio.delete()
                     artifact = merged
                 }
                 emit(mapOf("jobId" to jobId, "type" to "artifact", "path" to artifact.absolutePath, "filename" to artifact.name, "mediaType" to if (format == "mp3") "audio/mpeg" else "video/mp4", "size" to artifact.length()))
                 notify("Download completed", 100)
-            } catch (error: Exception) {
+            } catch (error: Throwable) {
                 val details = listOfNotNull(error.message, error.cause?.message, diagnostic.get()).joinToString(" ")
                 val failure = safeFailure(details)
                 emit(mapOf("jobId" to jobId, "type" to "failure", "category" to failure.first, "message" to failure.second))
@@ -160,8 +160,77 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
                 "format" to "That video does not offer a compatible stream. Try the other format."
             "javascript" in value || "js runtime" in value || "signature" in value ->
                 "extractor" to "YouTube changed its player. This Downbeat build needs an extractor update."
+            "unsatisfiedlink" in value || "native" in value && "load" in value ->
+                "conversion" to "This phone could not start the audio converter."
             else -> "download" to "Downbeat could not download this page. The site rejected the media request."
         }
+    }
+
+    private fun mergeMp4(video: File, audio: File, output: File) {
+        val videoExtractor = MediaExtractor()
+        val audioExtractor = MediaExtractor()
+        var muxer: MediaMuxer? = null
+        var started = false
+        try {
+            videoExtractor.setDataSource(video.absolutePath)
+            audioExtractor.setDataSource(audio.absolutePath)
+            val videoSourceTrack = findTrack(videoExtractor, "video/")
+            val audioSourceTrack = findTrack(audioExtractor, "audio/")
+            val videoFormat = videoExtractor.getTrackFormat(videoSourceTrack)
+            val audioFormat = audioExtractor.getTrackFormat(audioSourceTrack)
+            output.delete()
+            muxer = MediaMuxer(output.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+            val videoDestinationTrack = muxer.addTrack(videoFormat)
+            val audioDestinationTrack = muxer.addTrack(audioFormat)
+            muxer.start()
+            started = true
+            copyTrack(videoExtractor, videoSourceTrack, muxer, videoDestinationTrack, bufferSize(videoFormat))
+            copyTrack(audioExtractor, audioSourceTrack, muxer, audioDestinationTrack, bufferSize(audioFormat))
+        } finally {
+            if (started) runCatching { muxer?.stop() }
+            runCatching { muxer?.release() }
+            videoExtractor.release()
+            audioExtractor.release()
+        }
+        if (!output.exists() || output.length() == 0L) throw IllegalStateException("Video merge failed")
+    }
+
+    private fun findTrack(extractor: MediaExtractor, prefix: String): Int {
+        for (index in 0 until extractor.trackCount) {
+            val mime = extractor.getTrackFormat(index).getString(MediaFormat.KEY_MIME).orEmpty()
+            if (mime.startsWith(prefix)) return index
+        }
+        throw IllegalStateException("Downloaded media is missing its ${prefix.removeSuffix("/")} track")
+    }
+
+    private fun bufferSize(format: MediaFormat): Int {
+        val declared = if (format.containsKey(MediaFormat.KEY_MAX_INPUT_SIZE)) {
+            format.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE)
+        } else {
+            0
+        }
+        return declared.coerceIn(1 shl 20, 16 shl 20)
+    }
+
+    private fun copyTrack(
+        extractor: MediaExtractor,
+        sourceTrack: Int,
+        muxer: MediaMuxer,
+        destinationTrack: Int,
+        bufferSize: Int,
+    ) {
+        extractor.selectTrack(sourceTrack)
+        val buffer = ByteBuffer.allocateDirect(bufferSize)
+        val info = MediaCodec.BufferInfo()
+        while (true) {
+            buffer.clear()
+            val size = extractor.readSampleData(buffer, 0)
+            if (size < 0) break
+            info.set(0, size, extractor.sampleTime, extractor.sampleFlags)
+            muxer.writeSampleData(destinationTrack, buffer, info)
+            extractor.advance()
+        }
+        extractor.unselectTrack(sourceTrack)
     }
 
     private fun installCurrentYtDlp(appContext: Context) {
