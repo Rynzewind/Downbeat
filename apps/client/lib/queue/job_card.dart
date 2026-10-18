@@ -1,10 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../jobs/job.dart';
 import '../theme/app_theme.dart';
 
 final class JobCard extends StatelessWidget {
-  const JobCard({required this.job, this.onCancel, this.onRetry, this.onRedownload, this.onOpen, this.onRemove, super.key});
+  const JobCard({
+    required this.job,
+    this.onCancel,
+    this.onRetry,
+    this.onRedownload,
+    this.onOpen,
+    this.onRemove,
+    super.key,
+  });
   final Job job;
   final VoidCallback? onCancel;
   final VoidCallback? onRetry;
@@ -100,9 +109,19 @@ final class JobCard extends StatelessWidget {
                   if (job.message != null && job.message != _status)
                     Text(
                       job.message!,
-                      style: const TextStyle(color: Colors.white70, fontSize: 12),
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                      ),
                     ),
-                  if (_bytes != null) Text(_bytes!, style: const TextStyle(color: Colors.white54, fontSize: 12)),
+                  if (_bytes != null)
+                    Text(
+                      _bytes!,
+                      style: const TextStyle(
+                        color: Colors.white54,
+                        fontSize: 12,
+                      ),
+                    ),
                   const SizedBox(height: 7),
                   LinearProgressIndicator(
                     value: job.percent == null ? null : job.percent! / 100,
@@ -112,13 +131,59 @@ final class JobCard extends StatelessWidget {
                     backgroundColor: Colors.white10,
                   ),
                   const SizedBox(height: 8),
-                  Wrap(spacing: 8, children: [
-                    if (job.state.isActive && onCancel != null) TextButton(onPressed: onCancel, child: const Text('Cancel')),
-                    if ((job.state == JobState.failed || job.state == JobState.cancelled) && onRetry != null) TextButton(onPressed: onRetry, child: const Text('Retry')),
-                    if (job.state == JobState.completed && onRedownload != null) TextButton(onPressed: onRedownload, child: const Text('Redownload')),
-                    if (job.state == JobState.completed && job.outputPath != null && onOpen != null) TextButton(onPressed: onOpen, child: const Text('Open')),
-                    if (job.state.isTerminal && onRemove != null) TextButton(onPressed: onRemove, child: const Text('Remove')),
-                  ]),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      if (job.state.isActive && onCancel != null)
+                        TextButton(
+                          onPressed: onCancel,
+                          child: const Text('Cancel'),
+                        ),
+                      if ((job.state == JobState.failed ||
+                              job.state == JobState.cancelled) &&
+                          onRetry != null)
+                        TextButton(
+                          onPressed: onRetry,
+                          child: const Text('Retry'),
+                        ),
+                      if (job.state == JobState.failed && job.message != null)
+                        TextButton.icon(
+                          key: const Key('copy-error'),
+                          onPressed: () async {
+                            await Clipboard.setData(
+                              ClipboardData(text: job.message!),
+                            );
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Error details copied'),
+                                ),
+                              );
+                            }
+                          },
+                          icon: const Icon(Icons.copy_rounded, size: 17),
+                          label: const Text('Copy error'),
+                        ),
+                      if (job.state == JobState.completed &&
+                          onRedownload != null)
+                        TextButton(
+                          onPressed: onRedownload,
+                          child: const Text('Redownload'),
+                        ),
+                      if (job.state == JobState.completed &&
+                          job.outputPath != null &&
+                          onOpen != null)
+                        TextButton(
+                          onPressed: onOpen,
+                          child: const Text('Open'),
+                        ),
+                      if (job.state.isTerminal && onRemove != null)
+                        TextButton(
+                          onPressed: onRemove,
+                          child: const Text('Remove'),
+                        ),
+                    ],
+                  ),
                 ],
               ),
             ),

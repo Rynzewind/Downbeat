@@ -89,7 +89,13 @@ class MainActivity : FlutterActivity() {
                 contentResolver.update(uri, values, null, null)
             }
             result.success(uri.toString())
-        } catch (error: Exception) { result.error("publish", "Could not save the completed download", null) }
+        } catch (error: Exception) {
+            result.error(
+                "publish",
+                "Could not save the completed download",
+                "${error.javaClass.simpleName}: ${error.message.orEmpty()}"
+            )
+        }
     }
 
     private fun openDownload(value: String, result: MethodChannel.Result) {

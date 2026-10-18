@@ -9,7 +9,9 @@ import 'processing_event.dart';
 
 typedef JobIdFactory = String Function();
 typedef Clock = DateTime Function();
-typedef ArtifactPublisher = Future<DeliveredFile> Function(ProcessorArtifact artifact);
+typedef ArtifactPublisher = Future<DeliveredFile> Function(
+  ProcessorArtifact artifact,
+);
 
 final class LocalJobCoordinator {
   LocalJobCoordinator({
@@ -36,7 +38,8 @@ final class LocalJobCoordinator {
   String? _activeId;
   Future<void>? _drainFuture;
 
-  static String _defaultId() => DateTime.now().microsecondsSinceEpoch.toString();
+  static String _defaultId() =>
+      DateTime.now().microsecondsSinceEpoch.toString();
   static DateTime _defaultNow() => DateTime.now().toUtc();
 
   Future<void> start() async {
@@ -156,7 +159,10 @@ final class LocalJobCoordinator {
     String? cookiePath;
     final cookieHeader = _cookieHeaders.remove(initial.id);
     if (cookieHeader != null && cookieHeader.isNotEmpty) {
-      cookiePath = await workspace.writeCookieFile(initial.sourceUrl, cookieHeader);
+      cookiePath = await workspace.writeCookieFile(
+        initial.sourceUrl,
+        cookieHeader,
+      );
     }
     var job = initial.copyWith(
       state: JobState.fetching,
@@ -196,7 +202,9 @@ final class LocalJobCoordinator {
         await repository.upsert(
           current.copyWith(
             state: JobState.failed,
-            message: 'Local processing failed.',
+            message:
+                'Local processing failed during ${current.state.name}.\n'
+                'Debug: ${_safeDiagnostic(error)}',
             percent: null,
           ),
         );
@@ -205,6 +213,22 @@ final class LocalJobCoordinator {
       await workspace.cleanup();
       _workspaces.remove(initial.id);
     }
+  }
+
+  String _safeDiagnostic(Object error) {
+    var value = error.toString();
+    value = value.replaceAll(
+      RegExp(r'https?://\S+', caseSensitive: false),
+      '[url]',
+    );
+    value = value.replaceAll(RegExp(r'[A-Za-z]:\\[^\r\n,;]+'), '[file]');
+    value = value.replaceAll(RegExp(r'/data/(?:user|data)/[^\s,;]+'), '[file]');
+    value = value.replaceAll(
+      RegExp(r'(cookie|authorization|token)[=:]\s*\S+', caseSensitive: false),
+      r'$1=[hidden]',
+    );
+    value = value.replaceAll(RegExp(r'\s+'), ' ').trim();
+    return value.length <= 1200 ? value : value.substring(0, 1200);
   }
 
   Future<Job> _apply(Job job, ProcessingEvent event) async {
@@ -230,13 +254,15 @@ final class LocalJobCoordinator {
         var path = event.artifactPath!;
         var size = event.artifactSize!;
         if (publisher != null) {
-          final delivered = await publisher(ProcessorArtifact(
-            path: path,
-            filename: event.filename!,
-            mediaType: event.mediaType!,
-            size: size,
-            sha256: event.sha256,
-          ));
+          final delivered = await publisher(
+            ProcessorArtifact(
+              path: path,
+              filename: event.filename!,
+              mediaType: event.mediaType!,
+              size: size,
+              sha256: event.sha256,
+            ),
+          );
           path = delivered.path;
           size = delivered.size;
         }

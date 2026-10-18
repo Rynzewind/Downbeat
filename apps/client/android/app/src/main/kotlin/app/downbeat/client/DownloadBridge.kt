@@ -83,7 +83,9 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
                     val converted = File(workspace, artifact.name.substringBeforeLast('.') + ".mp3")
                     val command = "-y -i ${quote(artifact.absolutePath)} -vn -codec:a libmp3lame ${quote(converted.absolutePath)}"
                     val session = FFmpegKit.execute(command)
-                    if (!ReturnCode.isSuccess(session.returnCode)) throw IllegalStateException("Audio conversion failed")
+                    if (!ReturnCode.isSuccess(session.returnCode)) {
+                        throw IllegalStateException("Audio conversion failed (${session.returnCode}): ${session.allLogsAsString.takeLast(1200)}")
+                    }
                     artifact.delete()
                     artifact = converted
                 } else {
@@ -120,7 +122,8 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
             } catch (error: Throwable) {
                 val details = listOfNotNull(error.message, error.cause?.message, diagnostic.get()).joinToString(" ")
                 val failure = safeFailure(details)
-                emit(mapOf("jobId" to jobId, "type" to "failure", "category" to failure.first, "message" to failure.second))
+                val debug = sanitizeDiagnostic("${error.javaClass.simpleName}: $details", workspace)
+                emit(mapOf("jobId" to jobId, "type" to "failure", "category" to failure.first, "message" to "${failure.second}\nDebug: $debug"))
             } finally {
                 active = null; activeJobId = null
                 context.stopService(Intent(context, DownbeatDownloadService::class.java))
@@ -165,6 +168,13 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
             else -> "download" to "Downbeat could not download this page. The site rejected the media request."
         }
     }
+
+    private fun sanitizeDiagnostic(value: String, workspace: File): String = value
+        .replace(workspace.absolutePath, "[workspace]", ignoreCase = true)
+        .replace(Regex("https?://\\S+", RegexOption.IGNORE_CASE), "[url]")
+        .replace(Regex("(?i)(cookie|authorization|token)[=:]\\s*\\S+"), "\$1=[hidden]")
+        .replace(Regex("\\s+"), " ")
+        .take(1200)
 
     private fun mergeMp4(video: File, audio: File, output: File) {
         val videoExtractor = MediaExtractor()

@@ -1,6 +1,7 @@
 import 'package:downbeat/jobs/job.dart';
 import 'package:downbeat/queue/job_card.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -58,5 +59,36 @@ void main() {
           .value,
       isNull,
     );
+  });
+
+  testWidgets('failed jobs can copy diagnostic details', (tester) async {
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (_) async => null,
+    );
+    addTearDown(
+      () => messenger.setMockMethodCallHandler(SystemChannels.platform, null),
+    );
+    final job = Job(
+      id: 'failed',
+      sourceUrl: Uri.parse('https://example.com/watch/1'),
+      format: JobFormat.mp4,
+      state: JobState.failed,
+      message: 'Debug: MediaMuxer stopped',
+      createdAt: DateTime.utc(2026),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: JobCard(job: job)),
+      ),
+    );
+
+    expect(find.byKey(const Key('copy-error')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('copy-error')));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.text('Error details copied'), findsOneWidget);
   });
 }
