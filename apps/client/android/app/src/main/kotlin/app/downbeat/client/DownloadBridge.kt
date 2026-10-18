@@ -162,7 +162,13 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
                 "--extractor-args",
                 "youtube:player_client=web_safari,web_embedded,-tv_downgraded;formats=missing_pot"
             )
-            request.addOption("--remote-components", "ejs:github")
+            val quickJs = File(context.applicationInfo.nativeLibraryDir, "libqjs.so")
+            if (!quickJs.isFile) {
+                throw IllegalStateException("Bundled QuickJS runtime is missing")
+            }
+            YouTubeRuntimeOptions.forUrl(url, quickJs.absolutePath).forEach { (option, value) ->
+                request.addOption(option, value)
+            }
         }
     }
 

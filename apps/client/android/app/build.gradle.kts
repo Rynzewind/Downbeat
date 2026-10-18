@@ -37,12 +37,17 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+
+    packaging {
+        jniLibs.useLegacyPackaging = true
+    }
 }
 
 dependencies {
     implementation("androidx.documentfile:documentfile:1.1.0")
     implementation("dev.ffmpegkit-maintained:yt-dlp-android:2.0.2")
     implementation("dev.ffmpegkit-maintained:ffmpeg-kit-full:8.1.9")
+    testImplementation("junit:junit:4.13.2")
 }
 
 kotlin {
