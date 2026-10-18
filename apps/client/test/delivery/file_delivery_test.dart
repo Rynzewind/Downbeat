@@ -37,4 +37,79 @@ void main() {
     await expectLater(FileDelivery(availableBytes: (_) async => 1).save(stream, directory, 'large.mp4', expectedSize: 2, expectedSha256: 'x', acknowledge: () async {}), throwsA(isA<InsufficientStorageException>()));
     expect(listened, false);
   });
+
+  test('delivers a verified local artifact atomically', () async {
+    final source = File('${directory.path}${Platform.pathSeparator}source.tmp');
+    final bytes = utf8.encode('local media');
+    await source.writeAsBytes(bytes);
+    final downloads = await Directory.systemTemp.createTemp('downbeat-downloads-');
+    addTearDown(() => downloads.delete(recursive: true));
+    final delivery = FileDelivery(destinationDirectory: downloads);
+
+    final result = await delivery.deliver(
+      ProcessorArtifact(
+        path: source.path,
+        filename: 'video.mp4',
+        mediaType: 'video/mp4',
+        size: bytes.length,
+        sha256: sha256.convert(bytes).toString(),
+      ),
+    );
+
+    expect(result.path, endsWith('video.mp4'));
+    expect(result.size, bytes.length);
+    expect(await File(result.path).readAsBytes(), bytes);
+    expect(
+      downloads.listSync().whereType<File>().any(
+        (file) => file.path.endsWith('.downbeat-part'),
+      ),
+      isFalse,
+    );
+  });
+
+  test('rejects zero bytes, size mismatch and digest mismatch without debris', () async {
+    final downloads = await Directory.systemTemp.createTemp('downbeat-downloads-');
+    addTearDown(() => downloads.delete(recursive: true));
+    final source = File('${directory.path}${Platform.pathSeparator}source.tmp');
+    final delivery = FileDelivery(destinationDirectory: downloads);
+
+    await source.writeAsBytes(const []);
+    await expectLater(
+      delivery.deliver(
+        ProcessorArtifact(
+          path: source.path,
+          filename: 'empty.mp4',
+          mediaType: 'video/mp4',
+          size: 0,
+        ),
+      ),
+      throwsA(isA<DeliveryVerificationException>()),
+    );
+    await source.writeAsBytes([1, 2, 3]);
+    await expectLater(
+      delivery.deliver(
+        ProcessorArtifact(
+          path: source.path,
+          filename: 'wrong-size.mp4',
+          mediaType: 'video/mp4',
+          size: 2,
+        ),
+      ),
+      throwsA(isA<DeliveryVerificationException>()),
+    );
+    await expectLater(
+      delivery.deliver(
+        ProcessorArtifact(
+          path: source.path,
+          filename: 'wrong-hash.mp4',
+          mediaType: 'video/mp4',
+          size: 3,
+          sha256: 'bad',
+        ),
+      ),
+      throwsA(isA<DeliveryVerificationException>()),
+    );
+
+    expect(downloads.listSync(), isEmpty);
+  });
 }

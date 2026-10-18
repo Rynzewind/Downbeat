@@ -31,6 +31,9 @@ String safeFilename(String proposed, String extension, Set<String> existing) {
     'LPT9',
   };
   if (reserved.contains(stem.toUpperCase())) stem = '$stem file';
+  if (stem.runes.length > 180) {
+    stem = String.fromCharCodes(stem.runes.take(180));
+  }
 
   var candidate = '$stem$extension';
   var suffix = 2;

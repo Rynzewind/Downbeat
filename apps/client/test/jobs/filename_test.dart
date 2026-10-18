@@ -12,4 +12,11 @@ void main() {
       'Episode (2).mp3',
     );
   });
+
+  test('limits long Unicode names while preserving the extension', () {
+    final result = safeFilename(List.filled(200, '🎵').join(), '.mp3', const {});
+
+    expect(result.endsWith('.mp3'), isTrue);
+    expect(result.runes.length, lessThanOrEqualTo(184));
+  });
 }
