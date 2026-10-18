@@ -20,6 +20,7 @@ import io.flutter.plugin.common.MethodChannel
 import java.io.File
 import java.nio.ByteBuffer
 import java.util.concurrent.Future
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 
 class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHandler, EventChannel.StreamHandler {
@@ -27,11 +28,12 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
     private var sink: EventChannel.EventSink? = null
     private var active: Future<*>? = null
     private var activeJobId: String? = null
+    private var pythonRuntimeStatus = "Python runtime not checked"
 
     init {
         instance = this
         YtDlp.init(context.applicationContext)
-        installCurrentYtDlp(context.applicationContext)
+        pythonRuntimeStatus = installCurrentYtDlp(context.applicationContext)
     }
 
     override fun onListen(arguments: Any?, events: EventChannel.EventSink?) { sink = events }
@@ -70,12 +72,15 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
         activeJobId = jobId
         ContextCompat.startForegroundService(context, Intent(context, DownbeatDownloadService::class.java))
         emit(mapOf("jobId" to jobId, "type" to "stage", "stage" to "fetching", "message" to "Finding media"))
-        val diagnostic = AtomicReference("")
+        val diagnostic = AtomicReference(runtimeStatus(url))
         active = YtDlp.executeDebug(request, { level, message ->
             if (level.equals("error", ignoreCase = true) ||
                 level.equals("warning", ignoreCase = true) ||
                 message.contains("ERROR:", ignoreCase = true) ||
-                message.contains("WARNING:", ignoreCase = true)
+                message.contains("WARNING:", ignoreCase = true) ||
+                message.contains("[jsc", ignoreCase = true) ||
+                message.contains("JS runtimes", ignoreCase = true) ||
+                message.contains("EJS", ignoreCase = true)
             ) {
                 diagnostic.updateAndGet { "$it\n$message".takeLast(8000) }
             }
@@ -112,7 +117,10 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
                         if (level.equals("error", ignoreCase = true) ||
                             level.equals("warning", ignoreCase = true) ||
                             message.contains("ERROR:", ignoreCase = true) ||
-                            message.contains("WARNING:", ignoreCase = true)
+                            message.contains("WARNING:", ignoreCase = true) ||
+                            message.contains("[jsc", ignoreCase = true) ||
+                            message.contains("JS runtimes", ignoreCase = true) ||
+                            message.contains("EJS", ignoreCase = true)
                         ) {
                             diagnostic.updateAndGet { "$it\n$message".takeLast(8000) }
                         }
@@ -158,6 +166,7 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
     private fun configureSiteOptions(request: YtDlpRequest, url: String) {
         val host = runCatching { android.net.Uri.parse(url).host.orEmpty().lowercase() }.getOrDefault("")
         if (host == "youtube.com" || host.endsWith(".youtube.com") || host == "youtu.be") {
+            request.addOption("--verbose")
             request.addOption(
                 "--extractor-args",
                 "youtube:player_client=web_safari,web_embedded,-tv_downgraded;formats=missing_pot"
@@ -170,6 +179,24 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
                 request.addOption(option, value)
             }
         }
+    }
+
+    private fun runtimeStatus(url: String): String {
+        if (YouTubeRuntimeOptions.forUrl(url, "unused").isEmpty()) return pythonRuntimeStatus
+        val quickJs = File(context.applicationInfo.nativeLibraryDir, "libqjs.so")
+        val quickJsResult = runCatching {
+            val process = ProcessBuilder(quickJs.absolutePath, "-e", "console.log('downbeat-qjs-ok')")
+                .redirectErrorStream(true)
+                .start()
+            val finished = process.waitFor(5, TimeUnit.SECONDS)
+            if (!finished) {
+                process.destroyForcibly()
+                "timeout"
+            } else {
+                "exit=${process.exitValue()}, output=${process.inputStream.bufferedReader().readText().trim()}"
+            }
+        }.getOrElse { "failed=${it.javaClass.simpleName}:${it.message}" }
+        return "$pythonRuntimeStatus; QuickJS exists=${quickJs.isFile}, executable=${quickJs.canExecute()}, test=$quickJsResult"
     }
 
     private fun emitProgress(jobId: String, percent: Int, line: String) {
@@ -334,7 +361,7 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
         extractor.unselectTrack(sourceTrack)
     }
 
-    private fun installCurrentYtDlp(appContext: Context) {
+    private fun installCurrentYtDlp(appContext: Context): String {
         val wheels = PythonRuntimePackages.assets.map { assetName ->
             val wheel = File(appContext.filesDir, assetName.substringAfterLast('/'))
             if (!wheel.exists() || wheel.length() == 0L) {
@@ -348,6 +375,11 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
         val path = python.getModule("sys").get("path")
         wheels.asReversed().forEach { wheel -> path?.callAttr("insert", 0, wheel.absolutePath) }
         python.getModule("importlib").callAttr("invalidate_caches")
+        return runCatching {
+            val ejsVersion = python.getModule("yt_dlp_ejs").get("version")?.toString().orEmpty()
+            val dependency = python.getModule("yt_dlp.dependencies").get("yt_dlp_ejs")
+            "EJS version=$ejsVersion, registered=${dependency != null && dependency.toString() != "None"}"
+        }.getOrElse { "EJS import failed=${it.javaClass.simpleName}:${it.message}" }
     }
 
     companion object {
