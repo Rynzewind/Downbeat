@@ -100,21 +100,23 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
                 var artifact = workspace.walkTopDown().filter { it.isFile && it.name != "cookies.txt" }.maxByOrNull { it.lastModified() }
                     ?: throw IllegalStateException("No downloaded file was produced")
                 if (format == "mp3") {
-                    val converted = File(workspace, artifact.name.substringBeforeLast('.') + ".mp3")
-                    val command = "-y -i ${quote(artifact.absolutePath)} -vn -codec:a libmp3lame ${quote(converted.absolutePath)}"
-                    val session = executeFfmpegWithProgress(
-                        command = command,
-                        jobId = jobId,
-                        input = artifact,
-                        startPercent = 80,
-                        endPercent = 99,
-                        label = "Converting audio",
-                    )
-                    if (!ReturnCode.isSuccess(session.returnCode)) {
-                        throw IllegalStateException("Audio conversion failed (${session.returnCode}): ${session.allLogsAsString.takeLast(1200)}")
+                    val conversion = AudioConversion.plan(artifact)
+                    if (conversion.requiresConversion) {
+                        val command = "-y -i ${quote(artifact.absolutePath)} -vn -codec:a libmp3lame ${quote(conversion.output.absolutePath)}"
+                        val session = executeFfmpegWithProgress(
+                            command = command,
+                            jobId = jobId,
+                            input = artifact,
+                            startPercent = 80,
+                            endPercent = 99,
+                            label = "Converting audio",
+                        )
+                        if (!ReturnCode.isSuccess(session.returnCode)) {
+                            throw IllegalStateException("Audio conversion failed (${session.returnCode}): ${session.allLogsAsString.takeLast(1200)}")
+                        }
+                        artifact.delete()
                     }
-                    artifact.delete()
-                    artifact = converted
+                    artifact = conversion.output
                 } else {
                     val video = artifact
                     val audioRequest = YtDlpRequest(url)
