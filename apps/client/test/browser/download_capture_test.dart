@@ -4,6 +4,36 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  testWidgets('starts with media shortcuts instead of a placeholder webpage', (
+    tester,
+  ) async {
+    await tester.pumpWidget(DownbeatApp(repository: MemoryJobRepository()));
+
+    expect(find.text('BBC iPlayer'), findsOneWidget);
+    expect(find.text('YouTube'), findsOneWidget);
+    expect(find.text('Google'), findsOneWidget);
+    expect(find.byKey(const Key('download-fab')), findsNothing);
+  });
+
+  testWidgets('shortcut opens its website and Home restores the shortcuts', (
+    tester,
+  ) async {
+    await tester.pumpWidget(DownbeatApp(repository: MemoryJobRepository()));
+
+    await tester.tap(find.text('YouTube'));
+    await tester.pump();
+    final address = tester.widget<TextField>(
+      find.byKey(const Key('browser-address')),
+    );
+    expect(address.controller!.text, 'https://www.youtube.com/');
+    expect(find.byKey(const Key('download-fab')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('browser-home')));
+    await tester.pump();
+    expect(find.text('BBC iPlayer'), findsOneWidget);
+    expect(find.byKey(const Key('download-fab')), findsNothing);
+  });
+
   testWidgets('shows standard browser navigation controls', (tester) async {
     await tester.pumpWidget(DownbeatApp(repository: MemoryJobRepository()));
 
@@ -19,6 +49,8 @@ void main() {
     final repository = MemoryJobRepository();
     await tester.pumpWidget(DownbeatApp(repository: repository));
 
+    await tester.tap(find.text('Google'));
+    await tester.pump();
     await tester.tap(find.byKey(const Key('download-fab')));
     await tester.pumpAndSettle();
     expect(find.text('Choose a format'), findsOneWidget);

@@ -30,7 +30,7 @@ void main() {
   ) async {
     await tester.pumpWidget(DownbeatApp(repository: MemoryJobRepository()));
 
-    expect(find.text('Browse'), findsOneWidget);
+    expect(find.text('Where to?'), findsOneWidget);
     expect(find.byKey(const Key('browser-address')), findsOneWidget);
 
     await tester.tap(find.text('Queue'));

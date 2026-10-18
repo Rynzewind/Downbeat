@@ -36,6 +36,8 @@ final class _BrowserPageState extends State<BrowserPage>
     with AutomaticKeepAliveClientMixin {
   late final TextEditingController _address;
   Uri _current = Uri.parse('https://example.com');
+  bool _showHome = true;
+  bool _browserOpened = false;
   StreamSubscription<Uri>? _sharedSubscription;
   final _navigation = BrowserNavigationController();
 
@@ -46,12 +48,18 @@ final class _BrowserPageState extends State<BrowserPage>
   void initState() {
     super.initState();
     _current = widget.initialSharedUrl ?? _current;
-    _address = TextEditingController(text: _current.toString());
+    _showHome = widget.initialSharedUrl == null;
+    _browserOpened = widget.initialSharedUrl != null;
+    _address = TextEditingController(
+      text: widget.initialSharedUrl?.toString() ?? '',
+    );
     _sharedSubscription = widget.sharedUrls?.listen((url) {
       if (!mounted) return;
       setState(() {
         _current = url;
         _address.text = url.toString();
+        _showHome = false;
+        _browserOpened = true;
       });
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _chooseFormat();
@@ -74,14 +82,27 @@ final class _BrowserPageState extends State<BrowserPage>
   void _navigate() {
     try {
       final parsed = BrowserController.resolveInput(_address.text);
-      setState(() {
-        _current = parsed;
-        _address.text = parsed.toString();
-      });
+      _openPage(parsed);
     } on FormatException catch (error) {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(error.message.toString())));
     }
+  }
+
+  void _openPage(Uri url) {
+    setState(() {
+      _current = url;
+      _address.text = url.toString();
+      _showHome = false;
+      _browserOpened = true;
+    });
+  }
+
+  void _openHome() {
+    setState(() {
+      _showHome = true;
+      _address.clear();
+    });
   }
 
   Future<void> _chooseFormat() async {
@@ -187,12 +208,7 @@ final class _BrowserPageState extends State<BrowserPage>
                         IconButton(
                           key: const Key('browser-home'),
                           tooltip: 'Home',
-                          onPressed: () {
-                            setState(() {
-                              _current = Uri.parse('https://www.google.com');
-                              _address.text = _current.toString();
-                            });
-                          },
+                          onPressed: _openHome,
                           icon: const Icon(Icons.home_outlined),
                         ),
                       ],
@@ -210,85 +226,161 @@ final class _BrowserPageState extends State<BrowserPage>
                   borderRadius: BorderRadius.circular(24),
                   border: Border.all(color: Colors.white10),
                 ),
-                child: widget.enableNativeBrowser
-                    ? ClipRRect(
-                        borderRadius: BorderRadius.circular(24),
-                        child: NativeBrowserSurface(
-                          url: _current,
-                          navigationController: _navigation,
-                          onUrlChanged: (url) {
-                            if (!mounted || url == _current) return;
-                            setState(() {
-                              _current = url;
-                              _address.text = url.toString();
-                            });
-                          },
-                        ),
-                      )
-                    : Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(
-                            Icons.language,
-                            size: 72,
-                            color: AppColors.cyan,
-                          ),
-                          const SizedBox(height: 20),
-                          Text(
-                            'Browse',
-                            style: Theme.of(context).textTheme.headlineSmall,
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            _current.host,
-                            style: const TextStyle(color: Colors.white70),
-                          ),
-                          const SizedBox(height: 12),
-                          const Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 32),
-                            child: Text(
-                              'The native browser engine plugs into this surface in the packaged Android and Windows builds.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(color: Colors.white54),
-                            ),
-                          ),
-                        ],
-                      ),
+                child: IndexedStack(
+                  index: _showHome ? 0 : 1,
+                  children: [
+                    _BrowserHome(onOpen: _openPage),
+                    if (_browserOpened)
+                      widget.enableNativeBrowser
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(24),
+                              child: NativeBrowserSurface(
+                                url: _current,
+                                navigationController: _navigation,
+                                onUrlChanged: (url) {
+                                  if (!mounted || url == _current) return;
+                                  setState(() {
+                                    _current = url;
+                                    _address.text = url.toString();
+                                  });
+                                },
+                              ),
+                            )
+                          : Center(
+                              child: Text(
+                                _current.host,
+                                style: const TextStyle(color: Colors.white70),
+                              ),
+                            )
+                    else
+                      const SizedBox.expand(),
+                  ],
+                ),
               ),
             ),
           ],
         ),
-        Positioned(
-          right: 26,
-          bottom: 24,
-          child: Semantics(
-            button: true,
-            label: 'Download this page',
-            child: GestureDetector(
-              key: const Key('download-fab'),
-              onTap: _chooseFormat,
-              child: Container(
-                width: 76,
-                height: 76,
-                padding: const EdgeInsets.all(7),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppColors.surface,
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.violet.withValues(alpha: 0.55),
-                      blurRadius: 24,
-                    ),
-                  ],
+        if (!_showHome)
+          Positioned(
+            right: 26,
+            bottom: 24,
+            child: Semantics(
+              button: true,
+              label: 'Download this page',
+              child: GestureDetector(
+                key: const Key('download-fab'),
+                onTap: _chooseFormat,
+                child: Container(
+                  width: 76,
+                  height: 76,
+                  padding: const EdgeInsets.all(7),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.surface,
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.violet.withValues(alpha: 0.55),
+                        blurRadius: 24,
+                      ),
+                    ],
+                  ),
+                  child: Image.asset('assets/download.png'),
                 ),
-                child: Image.asset('assets/download.png'),
               ),
             ),
           ),
-        ),
       ],
     );
   }
+}
+
+final class _BrowserHome extends StatelessWidget {
+  const _BrowserHome({required this.onOpen});
+
+  final ValueChanged<Uri> onOpen;
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: SingleChildScrollView(
+      padding: const EdgeInsets.all(28),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Image.asset('assets/icon.png', width: 92, height: 92),
+          const SizedBox(height: 18),
+          Text('Where to?', style: Theme.of(context).textTheme.headlineSmall),
+          const SizedBox(height: 8),
+          const Text(
+            'Choose a shortcut or use the address bar above.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.white60),
+          ),
+          const SizedBox(height: 28),
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 14,
+            runSpacing: 14,
+            children: [
+              _BrowserShortcut(
+                label: 'BBC iPlayer',
+                icon: Icons.live_tv_rounded,
+                color: const Color(0xFFFF4C98),
+                onTap: () => onOpen(Uri.parse('https://www.bbc.co.uk/iplayer')),
+              ),
+              _BrowserShortcut(
+                label: 'YouTube',
+                icon: Icons.play_arrow_rounded,
+                color: const Color(0xFFFF3B4F),
+                onTap: () => onOpen(Uri.parse('https://www.youtube.com/')),
+              ),
+              _BrowserShortcut(
+                label: 'Google',
+                icon: Icons.search_rounded,
+                color: AppColors.cyan,
+                onTap: () => onOpen(Uri.parse('https://www.google.com/')),
+              ),
+            ],
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+final class _BrowserShortcut extends StatelessWidget {
+  const _BrowserShortcut({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: Colors.white.withValues(alpha: 0.06),
+    borderRadius: BorderRadius.circular(18),
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(18),
+      child: SizedBox(
+        width: 132,
+        height: 112,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: color, size: 38),
+            const SizedBox(height: 10),
+            Text(label, textAlign: TextAlign.center),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 final class _FormatSheet extends StatelessWidget {
