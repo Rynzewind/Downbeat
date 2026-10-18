@@ -20,6 +20,7 @@ build/
 **/android/.gradle/
 **/android/local.properties
 **/windows/flutter/ephemeral/
+apps/client/windows/runtime/
 
 # Cloud and secrets
 .wrangler/
