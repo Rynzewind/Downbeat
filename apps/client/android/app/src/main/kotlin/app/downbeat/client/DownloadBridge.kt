@@ -42,18 +42,19 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
         val format = call.argument<String>("format") ?: "mp4"
         val workspace = File(call.argument<String>("workspacePath")!!).apply { mkdirs() }
         val cookies = call.argument<String>("cookieFilePath")
-        val output = File(workspace, if (format == "mp3") "%(title).180B [%(id)s].source.%(ext)s" else "%(title).180B [%(id)s].%(ext)s")
+        val output = File(workspace, if (format == "mp3") "%(title).180B [%(id)s].source.%(ext)s" else "%(title).180B [%(id)s].video.%(ext)s")
         val request = YtDlpRequest(url).setOutputTemplate(output.absolutePath)
             .addOption("--no-playlist")
             .addOption("--no-part")
-            .addOption("--format", if (format == "mp3") "bestaudio/best" else "best[ext=mp4]/best")
+            .addOption("--format", if (format == "mp3") "bestaudio/best" else "bestvideo[ext=mp4][height<=720]/bestvideo[height<=720]")
         if (cookies != null) request.addOption("--cookies", cookies)
         activeJobId = jobId
         ContextCompat.startForegroundService(context, Intent(context, DownbeatDownloadService::class.java))
         emit(mapOf("jobId" to jobId, "type" to "stage", "stage" to "fetching", "message" to "Finding media"))
         active = YtDlp.executeAsync(request) { progress, _, _ ->
-            emit(mapOf("jobId" to jobId, "type" to "progress", "stage" to "downloading", "percent" to progress, "bytesReceived" to 0))
-            notify("Downloading ${progress.toInt()}%", progress.toInt())
+            val overall = if (format == "mp4") (progress * 0.75).toInt() else progress.toInt()
+            emit(mapOf("jobId" to jobId, "type" to "progress", "stage" to "downloading", "percent" to overall, "bytesReceived" to 0))
+            notify("Downloading $overall%", overall)
         }
         Thread {
             try {
@@ -68,6 +69,31 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
                     if (!ReturnCode.isSuccess(session.returnCode)) throw IllegalStateException("Audio conversion failed")
                     artifact.delete()
                     artifact = converted
+                } else {
+                    val video = artifact
+                    val audioRequest = YtDlpRequest(url)
+                        .setOutputTemplate(File(workspace, "downbeat-audio.%(ext)s").absolutePath)
+                        .addOption("--no-playlist")
+                        .addOption("--no-part")
+                        .addOption("--format", "bestaudio[ext=m4a]/bestaudio")
+                    if (cookies != null) audioRequest.addOption("--cookies", cookies)
+                    active = YtDlp.executeAsync(audioRequest) { progress, _, _ ->
+                        val overall = 75 + (progress * 0.2).toInt()
+                        emit(mapOf("jobId" to jobId, "type" to "progress", "stage" to "downloading", "percent" to overall, "bytesReceived" to 0))
+                        notify("Downloading audio $overall%", overall)
+                    }
+                    active!!.get()
+                    val audio = workspace.walkTopDown().filter { it.isFile && it.name.startsWith("downbeat-audio.") }.firstOrNull()
+                        ?: throw IllegalStateException("No audio stream was produced")
+                    emit(mapOf("jobId" to jobId, "type" to "stage", "stage" to "converting", "message" to "Merging video and audio"))
+                    val baseName = video.name.replace(Regex("\\.video\\.[^.]+$"), "")
+                    val merged = File(workspace, "$baseName.mp4")
+                    val command = "-y -i ${quote(video.absolutePath)} -i ${quote(audio.absolutePath)} -c:v copy -c:a aac -movflags +faststart ${quote(merged.absolutePath)}"
+                    val session = FFmpegKit.execute(command)
+                    if (!ReturnCode.isSuccess(session.returnCode)) throw IllegalStateException("Video merge failed")
+                    video.delete()
+                    audio.delete()
+                    artifact = merged
                 }
                 emit(mapOf("jobId" to jobId, "type" to "artifact", "path" to artifact.absolutePath, "filename" to artifact.name, "mediaType" to if (format == "mp3") "audio/mpeg" else "video/mp4", "size" to artifact.length()))
                 notify("Download completed", 100)
