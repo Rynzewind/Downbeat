@@ -1,5 +1,7 @@
 # Downbeat Portable Server Installer and Code Pairing Design
 
+> **Superseded:** Downbeat now processes downloads locally as defined in `2026-10-18-downbeat-local-processing-design.md`. This document is retained as historical design context only.
+
 ## Purpose
 
 Downbeat will run its processing backend on the owner's always-on Windows 10 or Windows 11 x64 computer. A reusable installer must make initial setup, repair, updates, backup, and migration understandable without command-line work. Android and Windows clients pair by entering one short generated code; users do not enter a URL or scan a QR code.

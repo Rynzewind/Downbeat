@@ -1,5 +1,7 @@
 # Cross-Platform Media Downloader Design
 
+> **Superseded:** The approved local-processing architecture is defined in `2026-10-18-downbeat-local-processing-design.md`. This document is retained as historical design context only.
+
 ## Purpose
 
 Rebuild the existing Windows Episode Downloader as a personal-use downloader for Android and Windows. Both clients provide an in-app browser, a floating download control, and a device-local queue. Downloads are processed on an internet-hosted backend so the Android device or Windows computer does not need to run `yt-dlp` or FFmpeg locally.
