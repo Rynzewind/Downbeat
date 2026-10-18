@@ -164,20 +164,15 @@ class DownloadBridge(private val context: Context) : MethodChannel.MethodCallHan
     private fun quote(value: String) = "\"${value.replace("\"", "\\\"")}\""
 
     private fun configureSiteOptions(request: YtDlpRequest, url: String) {
-        val host = runCatching { android.net.Uri.parse(url).host.orEmpty().lowercase() }.getOrDefault("")
-        if (host == "youtube.com" || host.endsWith(".youtube.com") || host == "youtu.be") {
-            request.addOption("--verbose")
-            request.addOption(
-                "--extractor-args",
-                "youtube:player_client=web_safari,web_embedded,-tv_downgraded;formats=missing_pot"
-            )
-            val quickJs = File(context.applicationInfo.nativeLibraryDir, "libqjs.so")
-            if (!quickJs.isFile) {
-                throw IllegalStateException("Bundled QuickJS runtime is missing")
-            }
-            YouTubeRuntimeOptions.forUrl(url, quickJs.absolutePath).forEach { (option, value) ->
-                request.addOption(option, value)
-            }
+        val quickJs = File(context.applicationInfo.nativeLibraryDir, "libqjs.so")
+        val options = YouTubeRuntimeOptions.forUrl(url, quickJs.absolutePath)
+        if (options.isEmpty()) return
+        if (!quickJs.isFile) {
+            throw IllegalStateException("Bundled QuickJS runtime is missing")
+        }
+        request.addOption("--verbose")
+        options.forEach { (option, value) ->
+            request.addOption(option, value)
         }
     }
 
